@@ -17,12 +17,12 @@ import {
 } from './lib/tracker';
 import { HIZBS, fromThumnId, pathHizbToMushaf, thumnPage } from './data/quran';
 import WarshReader from './components/WarshReader';
-import { NextStepCard } from './components/NextStep';
+import { TodayHero } from './components/NextStep';
 import { REMINDER_ANCHORS } from './lib/tracker';
 import { useSessionTimer, useTimerSeconds, type SessionTimer } from './lib/sessionTimer';
 import { markBackupDone, saveItem, shareOrDownload, shouldNudgeBackup } from './lib/storage';
 import { SessionRecorder } from './components/SessionRecorder';
-import { Brand, GeometricPattern, LeafDrawing, Modal, ProgressRing } from './components/Shared';
+import { Brand, LeafDrawing, Modal } from './components/Shared';
 import { HistoryPage, MistakeForm, MistakesPage, PlanPage, SettingsForm } from './components/Pages';
 import { Onboarding } from './components/Onboarding';
 import {
@@ -96,7 +96,6 @@ export default function App() {
   const plan = useMemo(() => calculatePlan(state, selectedDate), [state, selectedDate]);
   const record = state.records[selectedDate] || emptyRecord(plan);
   const completed = plan.tasks.filter(task => record.completed.includes(task)).length;
-  const percent = plan.tasks.length ? Math.round((completed / plan.tasks.length) * 100) : 0;
   const currentDay = selectedDate === today;
   const missedReview = hasMissedReview(state, selectedDate);
   const hasYesterdayTask = plan.tasks.includes('yesterday');
@@ -238,15 +237,6 @@ export default function App() {
     setState(previous => setTaskNote(previous, selectedDate, session, text));
   }
 
-  function startNext() {
-    if (selectedDate > today) { openDate(today); return; }
-    if (percent === 100) { navigate('history'); return; }
-    const order: TaskId[] = plan.isRest ? plan.tasks : farNeedsRedo || missedReview || record.checks['new:first']
-      ? ['yesterday', 'far', 'near', 'new'] : ['yesterday', 'new', 'far', 'near'];
-    const next = order.find(task => plan.tasks.includes(task) && !record.completed.includes(task));
-    if (next) openSession(next);
-  }
-
   const sessionMistakes = state.mistakes.filter(mistake => !mistake.resolved && (
     (mistake.dueAt <= selectedDate && mistake.reviewedAt !== selectedDate) || record.checks[`far:mistake:${mistake.id}`]
   ));
@@ -291,6 +281,28 @@ export default function App() {
     if (session === 'yesterday') return stepsChecked && record.yesterdayErrors !== null && record.yesterdayErrors < 2;
     if (session === 'new') return stepsChecked && record.reads >= required;
     return stepsChecked;
+  })();
+
+  /** Why the finish button is still disabled — a disabled primary action should never be a mystery. */
+  const finishHint = (() => {
+    if (!session || allStepsChecked) return null;
+    if (selectedDate > today) return 'هذا يوم قادم — يمكنك المعاينة، ويُسجَّل الإنجاز في يومه.';
+    if (session === 'near') {
+      const marked = plan.nearThumns.filter(id => record.nearMarks[id]).length;
+      return `بقي ${ar(Math.max(0, plan.nearThumns.length - marked))} من ${ar(plan.nearThumns.length)} ثمنًا حتى تُتمّ المراجعة.`;
+    }
+    if (session === 'yesterday') {
+      if (record.yesterdayErrors === null) return 'اختر عدد أخطاء التسميع أعلاه أولًا.';
+      if (record.yesterdayErrors >= 2) return 'أعد التسميع حتى لا يتجاوز الخطأ واحدًا.';
+    }
+    if (session === 'new' && record.reads < required) {
+      return `أكمل ${ar(required)} قراءات مركّزة أولًا — سجّلت ${ar(record.reads)}.`;
+    }
+    const pending = sessionSteps.filter(step => !record.checks[step.id]).length;
+    if (pending === 1) return 'بقيت خطوة واحدة لإتمام هذه الجلسة.';
+    if (pending === 2) return 'بقيت خطوتان لإتمام هذه الجلسة.';
+    if (pending > 2) return `بقيت ${ar(pending)} خطوات لإتمام هذه الجلسة.`;
+    return null;
   })();
 
   function finishSession() {
@@ -509,12 +521,44 @@ export default function App() {
     const Icon = TASK_ICONS[task];
     const done = record.completed.includes(task);
     const checkedSteps = Object.keys(record.checks).filter(key => key.startsWith(`${task}:`) && record.checks[key]).length;
-    return <motion.article layout key={task} className={`task-card task-${task} ${done ? 'task-done' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: task === 'near' ? 0.05 : task === 'far' ? 0.1 : 0 }}>
-      <div className="task-top"><span className="task-icon"><Icon size={23} strokeWidth={1.65} /></span><div className="task-copy"><div className="task-title-line"><h3>{TASK_NAMES[task]}</h3><span className="task-time">{TASK_TIMES[task]}</span></div><p>{taskDescription(task)}</p></div><button className={`task-check ${done ? 'checked' : ''}`} onClick={() => openSession(task)} aria-label={done ? `عرض ${TASK_NAMES[task]} المكتمل` : `بدء ${TASK_NAMES[task]}`}>{done ? <Check size={16} strokeWidth={2.5} /> : <span />}</button></div>
+    const totalSteps = getTaskSteps(task, plan, sessionMistakes).length;
+    const nearMarked = task === 'near' ? plan.nearThumns.filter(id => record.nearMarks[id]).length : 0;
+    const inProgress = !done && (checkedSteps > 0 || nearMarked > 0 || (task === 'yesterday' && record.yesterdayErrors !== null));
+    const progressRatio = task === 'near'
+      ? (plan.nearThumns.length ? nearMarked / plan.nearThumns.length : 0)
+      : (totalSteps ? checkedSteps / totalSteps : 0);
+    // One short, honest line under the title: how far in this step you already are.
+    const meta = done
+      ? 'تمّ بحمد الله'
+      : inProgress
+        ? task === 'near'
+          ? `${ar(nearMarked)} من ${ar(plan.nearThumns.length)} ثمن`
+          : task === 'yesterday'
+            ? 'سُجّل التسميع، أكمل الخطوات'
+            : `${ar(checkedSteps)} من ${ar(totalSteps)} خطوات`
+        : task === 'far' && !plan.isRest
+          ? `اليوم ${ar(plan.cycleDay)} من دورة ${ar(plan.cycleLength)} أيام`
+          : TASK_DURATIONS[task];
+    const actionLabel = done && !farNeedsRedo
+      ? 'عرض الإنجاز'
+      : inProgress
+        ? 'أكمل من حيث وصلت'
+        : task === 'new' && !newUnlocked
+        ? 'يُفتح بعد مراجعتك'
+        : task === 'new'
+          ? 'ابدأ الحفظ'
+          : task === 'links' || task === 'recite'
+            ? 'ابدأ الخطوة'
+            : task === 'far' && farNeedsRedo
+              ? 'أعد التسميع'
+              : 'ابدأ المراجعة';
+    return <motion.article layout key={task} className={`task-card task-${task} ${done ? 'task-done' : ''} ${inProgress ? 'task-started' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: task === 'near' ? 0.05 : task === 'far' ? 0.1 : 0 }}>
+      <div className="task-top"><span className="task-icon"><Icon size={23} strokeWidth={1.65} /></span><div className="task-copy"><div className="task-title-line"><h3>{TASK_NAMES[task]}</h3><span className="task-time">{TASK_TIMES[task]}</span></div><p>{taskDescription(task)}</p></div><span className={`task-status ${done ? 'checked' : inProgress ? 'started' : ''}`} aria-hidden="true">{done ? <Check size={16} strokeWidth={2.5} /> : inProgress ? <span /> : null}</span></div>
+      {inProgress && <div className="task-progress" aria-hidden="true"><i style={{ width: `${Math.round(progressRatio * 100)}%` }} /></div>}
       {task === 'new' && hasYesterdayTask && <button className={`prerequisite ${yesterdayDone ? 'prerequisite-done' : ''}`} onClick={() => openSession('yesterday')}><span>{yesterdayDone ? <CircleCheck size={15} /> : <Sun size={15} />} {yesterdayDone ? 'ثمن الأمس حاضر، على بركة الله' : 'قبل الجديد، سمّع ثمن الأمس'}</span>{yesterdayDone ? <Check size={14} /> : <ArrowLeft size={15} />}</button>}
       {task === 'far' && farNeedsRedo && done && <div className="notice notice-warm"><Heart size={17} /><p>أكثر من خطأين. أعد البعيدة قبل الحفظ الجديد.</p></div>}
       {task === 'far' && <CycleBar plan={plan} />}
-      <div className="task-bottom"><span className="task-duration">{done ? <CheckCheck size={14} /> : <Clock3 size={14} />} {done ? 'تمّ بحمد الله' : task === 'far' && !plan.isRest ? `اليوم ${ar(plan.cycleDay)} من دورة ${ar(plan.cycleLength)} أيام` : TASK_DURATIONS[task]}</span><button className="text-button task-action" onClick={() => openSession(task)}>{done && !farNeedsRedo ? 'عرض الإنجاز' : checkedSteps ? 'أكمل من حيث وصلت' : task === 'new' ? 'ابدأ الحفظ' : task === 'links' || task === 'recite' ? 'ابدأ الخطوة' : task === 'far' && farNeedsRedo ? 'أعد التسميع' : 'ابدأ المراجعة'}{task === 'new' && !newUnlocked && !done ? <LockKeyhole size={14} /> : <ArrowLeft size={15} />}</button></div>
+      <div className="task-bottom"><span className="task-duration">{done ? <CheckCheck size={14} /> : inProgress ? <ChartNoAxesCombined size={14} /> : <Clock3 size={14} />} {meta}</span><button className="task-action" onClick={() => openSession(task)} aria-label={`${actionLabel} — ${TASK_NAMES[task]}`}>{actionLabel}{task === 'new' && !newUnlocked && !done ? <LockKeyhole size={14} /> : <ArrowLeft size={15} />}</button></div>
     </motion.article>;
   }
 
@@ -528,7 +572,7 @@ export default function App() {
           nodes.push(<motion.article layout key="night" className="task-card task-night" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <div className="task-top"><span className="task-icon"><Moon size={23} strokeWidth={1.65} /></span><div className="task-copy"><div className="task-title-line"><h3>تسميع أخير للثمن</h3><span className="task-time">قبل النوم</span></div><p>{unitLabel(plan.units + 1)}</p></div></div>
             <div className="notice"><Sparkles size={17} /><p>سمّعه الآن من الذاكرة — التسميع قبل النوم يثبّت بالنوم.</p></div>
-            <div className="task-bottom"><span className="task-duration"><Clock3 size={14} /> نحو ٥ دقائق</span><button className="text-button task-action" onClick={() => openSession('new')}>أكمل التسميع <ArrowLeft size={15} /></button></div>
+            <div className="task-bottom"><span className="task-duration"><Clock3 size={14} /> نحو ٥ دقائق</span><button className="task-action" onClick={() => openSession('new')}>أكمل التسميع <ArrowLeft size={15} /></button></div>
           </motion.article>);
         }
         continue;
@@ -552,6 +596,7 @@ export default function App() {
   }
 
   return <MotionConfig reducedMotion="user"><div className="app-shell" dir="rtl">
+    <a className="skip-link" href="#main-content">تجاوز إلى المحتوى</a>
     <aside className="sidebar" aria-label="التنقل الرئيسي">
       <button className="brand-button" onClick={() => openDate(today)}><Brand /></button>
       <div className="sidebar-nav-label">مساحتك مع القرآن</div>
@@ -570,10 +615,21 @@ export default function App() {
             <header className="today-heading">
               <span className="eyebrow greeting"><Sun size={16} strokeWidth={1.5} /><span className="greeting-text">{state.settings.name ? `السلام عليك، يا ${state.settings.name}` : 'السلام عليك، يا رفيق القرآن'}</span><span className="greeting-date">{formatDate(selectedDate)}</span></span>
               <h1>كل يوم، أقرب إلى الإتقان.</h1>
-              <p>رحلة الألف آية تبدأ بورد، وتزهر بالمداومة. {currentDay && plan.estimatedPages > 0 && <span className="day-estimate">نحو {ar(plan.estimatedPages)} صفحة</span>}</p>
+              <p>رحلة الألف آية تبدأ بورد، وتزهر بالمداومة.</p>
             </header>
-            {currentDay && <NextStepCard tasks={plan.tasks} completed={record.completed} description={taskDescription} half={!!plan.newHalf} onStart={openSession} onHalf={setHalfMemorization} />}
-            <section className="daily-banner" aria-label="ملخص ورد اليوم"><GeometricPattern /><div className="banner-copy"><span className="banner-eyebrow"><Sparkles size={15} /> {percent === 100 ? 'بارك الله في سعيك' : plan.isRest ? 'مساحة للرسوخ والتثبيت' : 'على بركة الله'}</span><h2>{percent === 100 ? 'اكتمل وردك، وبقي أثره.' : plan.isRest ? 'اليوم نُثبّت ما زرعناه.' : 'وردٌ صغير، وأثرٌ كبير.'}</h2><p>{percent === 100 ? 'أعطيت القرآن من وقتك، فطوبى لقلبك بهذا الأنس.' : plan.isRest ? 'لا حفظ جديد اليوم. نعطي محفوظك حقّه من العناية.' : 'حفظٌ جديد، ومراجعة تُبقي الآيات قريبة من قلبك.'}</p><button className="button banner-button" onClick={startNext}>{!currentDay ? 'العودة إلى ورد اليوم' : percent === 100 ? 'شاهد أثر رحلتك' : completed > 0 ? 'نكمل على بركة الله' : 'بسم الله، نبدأ'}<ArrowLeft size={17} /></button></div><ProgressRing value={percent} complete={completed} total={plan.tasks.length} /></section>
+            <TodayHero
+              tasks={plan.tasks}
+              completed={record.completed}
+              description={taskDescription}
+              half={!!plan.newHalf}
+              isToday={currentDay}
+              isRest={plan.isRest}
+              estimatedPages={plan.estimatedPages}
+              onStart={openSession}
+              onHalf={setHalfMemorization}
+              onBackToToday={() => openDate(today)}
+              onSeeProgress={() => navigate('history')}
+            />
 
             <section className="week-strip" aria-label="أيام الأسبوع"><div className="week-label"><span>{shownWeek === weekStart(today) ? 'هذا الأسبوع' : formatDate(shownWeek, true)}</span><div><button className="week-arrow" aria-label="الأسبوع السابق" onClick={() => setShownWeek(value => addDays(value, -7))}><ChevronRight size={16} /></button><button className="week-arrow" aria-label="الأسبوع التالي" disabled={shownWeek > weekStart(today)} onClick={() => setShownWeek(value => addDays(value, 7))}><ChevronLeft size={16} /></button></div></div><div className="week-days">{Array.from({ length: 7 }, (_, i) => {
               const date = addDays(shownWeek, i);
@@ -655,7 +711,7 @@ export default function App() {
           {session && <TaskNote task={session} value={record.taskNotes[session] || ''} onChange={updateTaskNote} />}
           {session === 'far' && record.errors >= 2 && <div className="notice notice-warm"><Heart size={17} /><p>أكثر من خطأين — قصّر الدورة أو أبطئ الحفظ الجديد، وأعد البعيدة قبل فتح ثمن جديد.</p></div>}
           <button className="add-mistake-link" onClick={() => addMistake()}><Bookmark size={16} /><span>تعثّرت في موضع؟ سجّله للتثبيت</span><Plus size={17} /></button>
-          <div className="session-footer"><button className="button button-primary" disabled={!allStepsChecked} onClick={finishSession}><Check size={18} /> {session === 'yesterday' ? 'تمّ التسميع، نكمل' : session === 'new' ? 'أتممت حفظ الثمن وتسميعه' : session === 'near' ? 'أتممت المراجعة القريبة' : 'أتممت هذه الخطوة'}</button><button className="text-button muted-button" onClick={closeSession}>أكمل لاحقًا، احفظ تقدّمي</button></div>
+          <div className="session-footer"><button className="button button-primary" disabled={!allStepsChecked} onClick={finishSession}><Check size={18} /> {session === 'yesterday' ? 'تمّ التسميع، نكمل' : session === 'new' ? 'أتممت حفظ الثمن وتسميعه' : session === 'near' ? 'أتممت المراجعة القريبة' : 'أتممت هذه الخطوة'}</button>{finishHint && <p className="session-hint">{finishHint}</p>}<button className="text-button muted-button" onClick={closeSession}>أكمل لاحقًا، احفظ تقدّمي</button></div>
         </>}
       </Modal>}
       {mistakeOpen && <Modal key="mistake" title={editingMistake ? 'عناية بموضع التثبيت' : 'موضع يحتاج قليلًا من العناية'} subtitle="سجّله الآن، ليكون أقرب إلى الإتقان غدًا." icon={<Bookmark size={22} />} onClose={() => setMistakeOpen(false)}><MistakeForm existing={editingMistake} defaultHizb={currentHizb} onSave={saveMistake} onCancel={() => setMistakeOpen(false)} /></Modal>}

@@ -21,6 +21,10 @@ export function Onboarding({ onComplete }: { onComplete: (memorizedHizbs: number
     <div className="onboarding" dir="rtl">
       <div className="onboarding-inner">
         <div className="onboarding-brand"><Brand /></div>
+        <div className="onboarding-progress" aria-hidden="true">
+          <span className="ob-dots">{[0, 1, 2].map(index => <i key={index} className={index <= step ? 'on' : ''} />)}</span>
+          <span>الخطوة {ar(step + 1)} من {ar(3)}</span>
+        </div>
 
         {step === 0 && (
           <div className="onboarding-step rise-in">
