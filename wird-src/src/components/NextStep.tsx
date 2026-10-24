@@ -12,7 +12,7 @@ const ORDER: TaskId[] = ['yesterday', 'near', 'far', 'links', 'recite', 'new'];
  * competing calls to action for the same decision.
  */
 export function TodayHero({
-  tasks, completed, description, half, isToday, isRest, estimatedPages,
+  tasks, completed, description, half, isToday, isRest, estimatedUnits,
   onStart, onHalf, onBackToToday, onSeeProgress,
 }: {
   tasks: TaskId[];
@@ -21,7 +21,8 @@ export function TodayHero({
   half: boolean;
   isToday: boolean;
   isRest: boolean;
-  estimatedPages: number;
+  /** عدد أثمان اليوم — عدٌّ من جدول الأثمان، لا تقدير بالصفحات. */
+  estimatedUnits: number;
   onStart: (task: TaskId) => void;
   onHalf: (on: boolean) => void;
   onBackToToday: () => void;
@@ -46,8 +47,8 @@ export function TodayHero({
     ? 'بارك الله في سعيك. عُد غدًا بخطوة جديدة.'
     : isRest
       ? 'لا حفظ جديد اليوم. نعطي محفوظك حقّه من العناية.'
-      : estimatedPages > 0
-        ? `نحو ${ar(estimatedPages)} صفحة من الحفظ والمراجعة، على قدر استطاعتك.`
+      : estimatedUnits > 0
+        ? `${ar(estimatedUnits)} من الأثمان بين حفظ ومراجعة، على قدر استطاعتك.`
         : 'حفظٌ جديد، ومراجعة تُبقي الآيات قريبة من قلبك.';
 
   return (
@@ -84,7 +85,7 @@ export function TodayHero({
             </button>
           ) : (
             <button type="button" className="hero-cta" onClick={() => onStart(next!)}>
-              {next === 'new' ? (half ? 'ابدأ نصف الصفحة' : 'ابدأ الحفظ') : completed.length ? `أكمل ${TASK_NAMES[next!]}` : 'بسم الله، نبدأ'}
+              {next === 'new' ? (half ? 'ابدأ نصف الثمن' : 'ابدأ الحفظ') : completed.length ? `أكمل ${TASK_NAMES[next!]}` : 'بسم الله، نبدأ'}
               <ArrowLeft size={16} />
             </button>
           )}
@@ -94,7 +95,7 @@ export function TodayHero({
           half
             ? <button type="button" className="hero-link" onClick={() => onHalf(false)}>العودة إلى ثمن كامل</button>
             : <button type="button" className="hero-link" onClick={() => { onHalf(true); onStart('new'); }}>
-                لا أستطيع ثمنًا اليوم؟ يكفي نصف صفحة مع مراجعتك
+                لا أستطيع ثمنًا اليوم؟ يكفي نصف ثمن مع مراجعتك
               </button>
         )}
       </div>

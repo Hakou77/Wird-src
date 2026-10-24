@@ -1,0 +1,36 @@
+# إعدادات Netlify — للمشروع من هذا المجلد (يُرفع مضغوطًا ZIP أو من GitHub).
+#
+# إن رفعتَ محتوى مجلد wird-src نفسه مضغوطًا: هذا الملف في الجذر، فلا تحتاج شيئًا في لوحة Netlify.
+# إن رفعتَ مستودع Wird-src كاملًا: انظر netlify.tomل في جذر المستودع (يضبط base على wird-src).
+
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# مُعرِّف الخدمة (sw.js) لا يُخزَّن في الشبكة، وإلا بقي القارئ على النسخة القديمة
+# ولا وصلت تحديثات الأثمان. الكاش نفسه هو من يدير التحديث داخل التطبيق.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# ملفات Vite تحمل بصمة في اسمها، فتُخزَّن طويلًا بلا خوف.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# تطبيق بصفحة واحدة: كل مسار يصل إلى index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -4,11 +4,15 @@ import {
   ArrowLeft, BookOpen, Check, CircleHelp, Flame, Moon, Pause, Play, RefreshCw, Sparkles, Sun, X, Zap,
 } from 'lucide-react';
 import {
-  ar, READ_GAP_MS, formatDate, farTrendErrors, hizbHealth, hizbReviewHistory, readingAnalytics,
+  ar, READ_GAP_MS, farThumnBounds, formatDate, farTrendErrors, hizbHealth, hizbReviewHistory, readingAnalytics,
   thumnErrorsInWindow, thumnLabelShort, totalUnits,
   type DailyPlan, type DayRecord, type Difficulty, type HizbHealth, type TrackerState, type TaskId,
 } from '../lib/tracker';
-import { HIZBS, SURAHS, fromThumnId, hizbLabel, hizbPageSpan, mushafHizbToPath, pathHizbToMushaf, thumnId, toAr, RIWAYAH } from '../data/quran';
+import {
+  HIZBS, LAST_WARSH_PAGE, SURAHS, TOTAL_THUMNS, fromThumnId, hizbFocus, hizbLabel, hizbPagesLabel, hizbRangeLabel,
+  mushafHizbToPath, pageSpanLabel, pathHizbToMushaf, rangeLabel, thumnId, thumnPosition,
+  thumnRange, toAr, RIWAYAH,
+} from '../data/quran';
 import WarshReader from './WarshReader';
 
 const DIFFICULTIES: { id: Difficulty; label: string; hint: string }[] = [
@@ -427,7 +431,7 @@ export function MapPage({ state, today, onAddMistake }: {
             <header>
               <div>
                 <h2>الحزب {toAr(openHizb)}</h2>
-                <p>{hizbLabel(openHizb)} · ص {toAr(HIZBS[openHizb - 1].page)}</p>
+                <p>{hizbRangeLabel(openHizb)} · {hizbPagesLabel(openHizb)}</p>
               </div>
               <button className="icon-button" aria-label="إغلاق" onClick={() => setOpenHizb(null)}><X size={18} /></button>
             </header>
@@ -440,8 +444,9 @@ export function MapPage({ state, today, onAddMistake }: {
             <WarshReader
               key={`mushaf-hizb-${openHizb}`}
               defaultSurah={HIZBS[openHizb - 1]?.surah ?? 1}
+              focus={hizbFocus(openHizb)}
               title={`نص الحزب ${toAr(openHizb)} من المصحف (ورش)`}
-              hint="يبدأ من سورة بداية الحزب؛ تنقّل بين السور لمتابعة بقية الحزب. تُحفظ السور بعد أول تحميل."
+              hint="يبدأ من أول آية في الحزب على جدول أثمان ورش؛ تنقّل بين السور لمتابعة بقية الحزب. تُحفظ السور بعد أول تحميل."
             />
             <HizbThumnErrors state={state} mushafHizb={openHizb} />
             <section className="hizb-history">
@@ -580,8 +585,9 @@ export function PathMap({ plan }: { plan: DailyPlan }) {
   const inCurrent = units >= 480 ? 8 : units % 8;
   const distant = new Set(plan.farHizbs);
   const nearHizbs = new Set(plan.nearThumns.map(id => fromThumnId(id).hizb));
-  const pages = Math.round(units * 1.25);
   const ajza = (completed / 2).toFixed(1);
+  // صفحةٌ حقيقية من جدول ورش: صفحة آخر آية محفوظة، لا تقديرٌ بعدد الأثمان.
+  const reachedPage = units >= 1 ? thumnPosition(Math.min(TOTAL_THUMNS, units)).endPage : 1;
 
   function kindOf(n: number): 'distant' | 'near' | 'current' | 'done' | 'future' {
     const pathIdx = mushafHizbToPath(n);
@@ -607,7 +613,7 @@ export function PathMap({ plan }: { plan: DailyPlan }) {
       </div>
       <div className="path-stats">
         <div className="path-stat"><small>محفوظ</small><strong>{ar(units)} ثمن</strong></div>
-        <div className="path-stat"><small>نحو</small><strong>{ar(pages)} صفحة</strong></div>
+        <div className="path-stat"><small>وصلتَ إلى</small><strong>ص {toAr(reachedPage)}</strong> من {toAr(LAST_WARSH_PAGE)}</div>
         <div className="path-stat"><small>أجزاء</small><strong>{toAr(ajza)}</strong></div>
       </div>
       <div className="path-legend">
@@ -639,12 +645,11 @@ export function PathMap({ plan }: { plan: DailyPlan }) {
 }
 
 function HizbCell({ n, kind, inCurrent }: { n: number; kind: string; inCurrent: number }) {
-  const h = HIZBS[n - 1];
   return (
     <div className={`hizb-cell k-${kind}`}>
       <div className="hizb-cell-top">
         <span>{toAr(n)}</span>
-        <small>ص {toAr(h.page)}</small>
+        <small>ص {toAr(HIZBS[n - 1]?.page ?? 1)}</small>
       </div>
       <div className="hizb-cell-label">{hizbLabel(n)}</div>
       <div className="hizb-eighths">
@@ -678,13 +683,16 @@ export function useReadGate(lastReadAt: number | null) {
   return { hint, setHint, tryRead };
 }
 
+/**
+ * مدى المراجعة البعيدة = أثمان جدول ورش نفسها: نصف الحزب أربعة أثمان، وكامله ثمانية.
+ * بلا أرقام صفحات: ترقيم المدينة لا يوافق مصحف ورش، وجدول الصفحات الورشي لم يُضَف بعد.
+ */
 export function farSpanLabel(plan: DailyPlan): string {
   if (!plan.farHizbs.length) return '';
+  const { from, to } = farThumnBounds(plan.farHalf);
   const parts = plan.farHizbs.map(h => {
-    const span = hizbPageSpan(h);
-    if (plan.farHalf === 0) return `ص ${toAr(span.start)}–${toAr(span.end)}`;
-    const mid = Math.round((span.start + span.end) / 2);
-    return plan.farHalf === 1 ? `ص ${toAr(span.start)}–${toAr(mid)}` : `ص ${toAr(mid + 1)}–${toAr(span.end)}`;
+    const { startSurah, startAyah, endSurah, endAyah, startPage, endPage } = thumnRange(h, from, to);
+    return `${rangeLabel(startSurah, startAyah, endSurah, endAyah)} · ${pageSpanLabel(startPage, endPage)}`;
   });
   return parts.join(' · ');
 }

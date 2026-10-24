@@ -16,7 +16,7 @@ function monthStats(state: TrackerState, prefix: string) {
 function reflection(days: number) {
   if (days >= 20) return 'مداومة جميلة. ثبّتها بهدوء ولا تستعجل.';
   if (days >= 10) return 'بدأت عادة تتشكّل. استمر بخطوات صغيرة.';
-  if (days >= 1) return 'كل يوم تعود فيه نجاح. في الأيام الصعبة يكفيك نصف صفحة مع المراجعة.';
+  if (days >= 1) return 'كل يوم تعود فيه نجاح. في الأيام الصعبة يكفيك نصف ثمن مع المراجعة.';
   return 'شهر هادئ. ابدأ بخطوة واحدة اليوم.';
 }
 
@@ -46,7 +46,7 @@ export function ProgressNotes({ state, today }: { state: TrackerState; today: st
         <CalendarCheck size={20} />
         <div>
           <strong>{showLast ? `حصاد ${month}` : `هذا الشهر · ${month}`}</strong>
-          <small>{ar(stats.days)} يومًا مكتملًا · {ar(stats.minutes)} دقيقة{stats.minimal > 0 ? ` · ${ar(stats.minimal)} بنصف صفحة` : ''}</small>
+          <small>{ar(stats.days)} يومًا مكتملًا · {ar(stats.minutes)} دقيقة{stats.minimal > 0 ? ` · ${ar(stats.minimal)} بنصف ثمن` : ''}</small>
           <p>{reflection(stats.days)}</p>
         </div>
       </div>

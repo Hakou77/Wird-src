@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import {
   addDays, allNearMarked, ar, calculatePlan, dateKey, defaultState, dueMistakes, emptyRecord,
-  farLabel, farThumnIds, formatDate, fromKey, getStreak, getTaskSteps, hasMissedReview, hijriDate,
+  farLabel, farThumnBounds, farThumnIds, formatDate, fromKey, getStreak, getTaskSteps, hasMissedReview, hijriDate,
   isDayComplete, isValidState, loadState, nearLabel, ordinal, requiredReads, setTaskNote, STORAGE_KEY,
   TASK_NAMES, totalUnits, unitLabel, weekStart, WEEKDAYS,
   type DayRecord, type Difficulty, type Mistake, type MistakeKind, type NearMark, type Page,
   type Settings, type TaskId, type TrackerState,
 } from './lib/tracker';
-import { HIZBS, pathHizbToMushaf, thumnPosition, thumnRangeLabel } from './data/quran';
+import { HIZBS, focusFromPosition, pathHizbToMushaf, thumnPageLabel, thumnPosition, thumnRange, thumnRangeLabel } from './data/quran';
 import WarshReader from './components/WarshReader';
 import { TodayHero } from './components/NextStep';
 import { Guide } from './components/Guide';
@@ -192,13 +192,13 @@ export default function App() {
     });
   }
 
-  /** Minimum day: half a page of new memorization (plus the reviews) is enough for the day to count. */
+  /** Minimum day: about half a thumn of new memorization (plus the reviews) is enough for the day to count. */
   function setHalfMemorization(on: boolean) {
     setState(previous => {
       const base = previous.records[today] || emptyRecord(calculatePlan(previous, today));
       return { ...previous, records: { ...previous.records, [today]: { ...base, plan: { ...base.plan, newHalf: on } } } };
     });
-    if (on) notify('الحد الأدنى اليوم: نصف صفحة من الحفظ الجديد مع مراجعتك.');
+    if (on) notify('الحد الأدنى اليوم: نصف ثمن من الحفظ الجديد مع مراجعتك.');
   }
 
   function openSession(task: TaskId) {
@@ -246,8 +246,8 @@ export default function App() {
   const sessionDone = !!session && record.completed.includes(session);
   /**
    * أين يقع ورد هذه الجلسة بالضبط (سورة + آية).
-   * كل الأثمان تُحسب من حدود الأحزاب وعدد الآيات، فلا يعود العارض يفتح على بداية الحزب
-   * بينما يقول العنوان «الثمن الثاني».
+   * المصدر جدولُ أثمان ورش وحده — بدايةُ كل ثمن ما يلي نهايةَ ما قبله — فلا يفتح العارض
+   * على بداية الحزب بينما يقول العنوان «الثمن الثالث».
    */
   const mushafTarget = (() => {
     try {
@@ -256,19 +256,18 @@ export default function App() {
       if (session === 'yesterday') return thumnPosition(plan.units);
       if (session === 'near' && plan.nearThumns.length) return thumnPosition(plan.nearThumns[0]);
       if (session === 'far' && plan.farHizbs.length) {
-        const hizb = HIZBS[plan.farHizbs[0] - 1];
-        return hizb
-          ? { hizb: plan.farHizbs[0], thumn: 0, startSurah: hizb.surah, startAyah: hizb.ayah, endSurah: hizb.surah, endAyah: hizb.ayah }
-          : undefined;
+        // نصف الحزب أو كامله — الحدود من جدول الأثمان، فتطابق المراجعة البعيدة ما يُعرض من نص.
+        const hizb = plan.farHizbs[0];
+        const { from, to } = farThumnBounds(plan.farHalf);
+        return { hizb, thumn: from, ...thumnRange(hizb, from, to) };
       }
       return undefined;
     } catch {
       return undefined;
     }
   })();
-  const mushafFocus = mushafTarget
-    ? { surah: mushafTarget.startSurah, ayah: mushafTarget.startAyah, endSurah: mushafTarget.endSurah, endAyah: mushafTarget.endAyah }
-    : undefined;
+  // البؤرة تحمل ترقيم مصحف ورش وصفحتيه، فيتطابق المُبرزُ مع العنوان حتى بلا شبكة.
+  const mushafFocus = mushafTarget ? focusFromPosition(mushafTarget) : undefined;
   const mushafSurah = mushafTarget?.startSurah ?? HIZBS[currentHizb - 1]?.surah ?? 1;
   const mushafTitle =
     session === 'new' ? 'نص الثمن الجديد من المصحف (ورش)'
@@ -504,13 +503,13 @@ export default function App() {
   /** One exact locator straight from the thumn table: hizb · thumn · the ayahs it spans. */
   function unitWhere(unit: number) {
     const { hizb, thumn } = thumnPosition(unit);
-    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · ${thumnRangeLabel(unit)}`;
+    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · ${thumnRangeLabel(unit)} · ${thumnPageLabel(unit)}`;
   }
 
   function taskDescription(task: TaskId): string {
     switch (task) {
       case 'yesterday': return unitWhere(plan.units);
-      case 'new': return plan.newHalf ? `الحد الأدنى: نصف صفحة — ${unitWhere(plan.units + 1)}` : unitWhere(plan.units + 1);
+      case 'new': return plan.newHalf ? `الحد الأدنى: نصف ثمن — ${unitWhere(plan.units + 1)}` : unitWhere(plan.units + 1);
       case 'near': return `${nearLabel(plan)} · ${ar(plan.nearThumns.length)} أثمان`;
       case 'far': {
         const span = farSpanLabel(plan);
@@ -628,7 +627,7 @@ export default function App() {
               half={!!plan.newHalf}
               isToday={currentDay}
               isRest={plan.isRest}
-              estimatedPages={plan.estimatedPages}
+              estimatedUnits={plan.estimatedUnits}
               onStart={openSession}
               onHalf={setHalfMemorization}
               onBackToToday={() => openDate(today)}
