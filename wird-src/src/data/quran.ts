@@ -195,6 +195,57 @@ export const TOTAL_SURAHS = 114;
 export const TOTAL_THUMNS = 480;
 export const LAST_PAGE = 604;
 
+/** عدد آيات كل سورة (١..١١٤) — يُستخدم لتحديد موضع الثمن بدقة داخل الحزب. */
+export const AYAH_COUNTS: number[] = [
+  0, 7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98,
+  135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75,
+  85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60, 49, 62, 55, 78, 96, 29, 22, 24,
+  13, 14, 11, 11, 18, 12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46,
+  42, 29, 19, 36, 25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8,
+  11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6,
+];
+
+/** مجموع الآيات قبل كل سورة (0 = قبل الفاتحة). */
+const AYAH_OFFSET: number[] = (() => {
+  const offsets = [0];
+  for (let surah = 1; surah <= TOTAL_SURAHS; surah++) offsets.push(offsets[surah - 1] + (AYAH_COUNTS[surah] ?? 0));
+  return offsets;
+})();
+
+export const TOTAL_AYAHS = AYAH_OFFSET[TOTAL_SURAHS];
+
+function toSurahAyah(absolute: number): { surah: number; ayah: number } {
+  const clamped = Math.max(0, Math.min(TOTAL_AYAHS - 1, Math.round(absolute)));
+  let surah = 1;
+  while (surah < TOTAL_SURAHS && AYAH_OFFSET[surah] <= clamped) surah++;
+  while (surah > 1 && AYAH_OFFSET[surah - 1] > clamped) surah--;
+  const ayah = clamped - AYAH_OFFSET[surah - 1] + 1;
+  return { surah, ayah };
+}
+
+/**
+ * أين يقع الثمن بالضبط: السورة والآية ورقم الصفحة.
+ * حدود الأحزاب معروفة في الجدول أعلاه، فيُقسَّم ما بين بداية الحزب وبداية الحزب التالي
+ * على ثمانية أثمان بحسب عدد الآيات، ثم يُحوَّل الموضع إلى سورة وآية.
+ * الموضع تقريبي في حدوده الأولى (قد يبدأ الثمن قبل الآية المحسوبة آية أو آيتين).
+ */
+export function thumnPosition(unit: number): { surah: number; ayah: number; page: number; hizb: number; thumn: number } {
+  const { hizb, thumn } = fromThumnId(Math.min(TOTAL_THUMNS, Math.max(1, unit)));
+  const start = HIZBS[hizb - 1];
+  const next = HIZBS[hizb];
+  const startAbsolute = AYAH_OFFSET[start.surah - 1] + (start.ayah - 1);
+  const endAbsolute = next ? AYAH_OFFSET[next.surah - 1] + (next.ayah - 1) : TOTAL_AYAHS;
+  const span = Math.max(1, endAbsolute - startAbsolute);
+  const absolute = startAbsolute + (span * (thumn - 1)) / THUMNS_PER_HIZB;
+  const { surah, ayah } = toSurahAyah(absolute);
+  return { surah, ayah, page: thumnPage(unit), hizb, thumn };
+}
+
+export function thumnSurah(unit: number): number {
+  return thumnPosition(unit).surah;
+}
+
+
 export function hizbPageSpan(hizb: number): { start: number; end: number; pages: number } {
   const start = HIZBS[hizb - 1].page;
   const end = hizb === 60 ? LAST_PAGE : HIZBS[hizb].page - 1;

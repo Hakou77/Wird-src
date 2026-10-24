@@ -15,7 +15,7 @@ import {
   type DayRecord, type Difficulty, type Mistake, type MistakeKind, type NearMark, type Page,
   type Settings, type TaskId, type TrackerState,
 } from './lib/tracker';
-import { HIZBS, SURAHS, fromThumnId, pathHizbToMushaf, thumnPage } from './data/quran';
+import { HIZBS, SURAHS, pathHizbToMushaf, thumnPosition } from './data/quran';
 import WarshReader from './components/WarshReader';
 import { TodayHero } from './components/NextStep';
 import { Guide } from './components/Guide';
@@ -244,31 +244,28 @@ export default function App() {
   ));
   const sessionSteps = session ? getTaskSteps(session, plan, sessionMistakes) : [];
   const sessionDone = !!session && record.completed.includes(session);
-  const mushafSurah = (() => {
-    // المواضع التي يُفترض فيها عرض المصحف هي نوافذ الجلسات.
-    // لا نملك حدود الأثمان بدقة سورة/آية، فنبدأ من سورة بداية الحزب
-    // ثم يتنقل الحافظ يدويًا داخل العارض.
+  /**
+   * أين يقع ورد هذه الجلسة بالضبط (سورة + آية).
+   * كل الأثمان تُحسب من حدود الأحزاب وعدد الآيات، فلا يعود العارض يفتح على بداية الحزب
+   * بينما يقول العنوان «الثمن الثاني».
+   */
+  const mushafTarget = (() => {
     try {
-      if (!session) return HIZBS[currentHizb - 1]?.surah ?? 1;
-      if (session === 'new') {
-        const unit = Math.min(480, Math.max(1, plan.units + 1));
-        return HIZBS[fromThumnId(unit).hizb - 1]?.surah ?? 1;
-      }
-      if (session === 'yesterday') {
-        const unit = Math.min(480, Math.max(1, plan.units));
-        return HIZBS[fromThumnId(unit).hizb - 1]?.surah ?? 1;
-      }
-      if (session === 'near' && plan.nearThumns.length) {
-        return HIZBS[fromThumnId(plan.nearThumns[0]).hizb - 1]?.surah ?? 1;
-      }
+      if (!session) return undefined;
+      if (session === 'new') return thumnPosition(plan.units + 1);
+      if (session === 'yesterday') return thumnPosition(plan.units);
+      if (session === 'near' && plan.nearThumns.length) return thumnPosition(plan.nearThumns[0]);
       if (session === 'far' && plan.farHizbs.length) {
-        return HIZBS[plan.farHizbs[0] - 1]?.surah ?? 1;
+        const hizb = HIZBS[plan.farHizbs[0] - 1];
+        return hizb ? { surah: hizb.surah, ayah: hizb.ayah } : undefined;
       }
-      return HIZBS[currentHizb - 1]?.surah ?? 1;
+      return undefined;
     } catch {
-      return 1;
+      return undefined;
     }
   })();
+  const mushafFocus = mushafTarget ? { surah: mushafTarget.surah, ayah: mushafTarget.ayah } : undefined;
+  const mushafSurah = mushafTarget?.surah ?? HIZBS[currentHizb - 1]?.surah ?? 1;
   const mushafTitle =
     session === 'new' ? 'نص الثمن الجديد من المصحف (ورش)'
     : session === 'yesterday' ? 'نص ثمن الأمس من المصحف (ورش)'
@@ -500,12 +497,11 @@ export default function App() {
     setConfirmation(null);
   }
 
-  /** One short locator: hizb · thumn · surah · page. Replaces the duplicated unit text. */
+  /** One short locator that stays honest: hizb · thumn · the surah and ayah you actually reach. */
   function unitWhere(unit: number) {
-    const safe = Math.min(480, Math.max(1, unit));
-    const { hizb, thumn } = fromThumnId(safe);
-    const surah = SURAHS[HIZBS[hizb - 1]?.surah ?? 1];
-    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · من سورة ${surah} · ص ${ar(thumnPage(safe))}`;
+    const { hizb, thumn, surah, ayah, page } = thumnPosition(unit);
+    // «≈» لأن موضع بداية الثمن محسوب من عدد الآيات داخل الحزب، لا من جدول أثمان جاهز.
+    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · ${SURAHS[surah]} ≈${ar(ayah)} · ص ${ar(page)}`;
   }
 
   function taskDescription(task: TaskId): string {
@@ -709,6 +705,7 @@ export default function App() {
             <WarshReader
               key={`mushaf-${session}-${plan.date}-${mushafSurah}`}
               defaultSurah={mushafSurah}
+              focus={mushafFocus}
               title={mushafTitle}
               defaultOpen={session === 'new'}
             />

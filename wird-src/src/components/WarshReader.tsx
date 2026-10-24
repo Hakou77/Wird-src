@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Crosshair } from 'lucide-react';
 import { SURAHS, SURAHS_BY_PATH, TOTAL_SURAHS, surahPathIndex, toAr } from '../data/quran';
 
 type Ayah = { number: number; text: string };
@@ -101,12 +101,15 @@ export default function WarshReader({
   title = 'نص المصحف برواية ورش',
   hint = 'يتطلب الاتصال أول مرة، ثم تُحفظ السورة على جهازك للمراجعة دون اتصال.',
   orderHint = 'السور مرتّبة على رحلة حفظك: من الناس إلى الفاتحة.',
+  focus,
   defaultOpen = false,
 }: {
   defaultSurah: number;
   title?: string;
   hint?: string;
   orderHint?: string;
+  /** Locate the exact ayah you are working on, so the text matches the task label. */
+  focus?: { surah: number; ayah: number };
   defaultOpen?: boolean;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -172,6 +175,26 @@ export default function WarshReader({
     setSurahInput(String(safe));
     void showSurah(safe);
   }, [defaultSurah, showSurah]);
+
+  const ayatRef = useRef<HTMLDivElement>(null);
+  const scrolledTo = useRef('');
+  // Put the target ayah in front of the reader instead of the top of the surah.
+  // Runs once per target so it never fights the reader when they scroll or tick a step.
+  useEffect(() => {
+    if (!focus || loadedSurah !== focus.surah) return;
+    const key = `${focus.surah}:${focus.ayah}:${loadedSurah}`;
+    if (scrolledTo.current === key) return;
+    const container = ayatRef.current;
+    const target = container?.querySelector<HTMLElement>(`[data-ayah="${focus.surah}:${focus.ayah}"]`);
+    if (!container || !target) return;
+    const frame = window.requestAnimationFrame(() => {
+      const containerTop = container.getBoundingClientRect().top;
+      const targetTop = target.getBoundingClientRect().top;
+      container.scrollTop += targetTop - containerTop - 6;
+      scrolledTo.current = key;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focus, loadedSurah, ayat]);
 
   const surahNumber = Number(surahInput);
   const surahName = surahNumber >= 1 && surahNumber <= TOTAL_SURAHS ? SURAHS[surahNumber] : '';
@@ -240,6 +263,15 @@ export default function WarshReader({
             </button>
           </div>
         </div>
+        {focus && (
+          <div className="warsh-target">
+            <Crosshair size={14} />
+            <span>موضع وردك: سورة {SURAHS[focus.surah]} · الآية {toAr(focus.ayah)} تقريبًا</span>
+            {loadedSurah !== focus.surah && (
+              <button type="button" className="warsh-target-go" onClick={() => go(focus.surah)}>انتقل إلى موضعي</button>
+            )}
+          </div>
+        )}
         {surahName && loadedSurah === surahNumber && (
           <h4 className="warsh-surah-name">
             سورة {surahName}
@@ -251,16 +283,20 @@ export default function WarshReader({
         </p>
         <div
           id={`warsh-ayat-${uid}`}
+          ref={ayatRef}
           className="warsh-ayat"
           style={fontApplied ? { fontFamily: '"WarshQuran", "Noto Naskh Arabic", serif' } : undefined}
         >
           {showBasmala && <p className="basmala">{basmala}</p>}
-          {ayat.map(ayah => (
-            <p key={ayah.number} data-ayah={`${loadedSurah}:${ayah.number}`}>
-              {ayah.text}
-              <span className="ayah-number"> ﴿{toArabicDigits(ayah.number)}﴾</span>
-            </p>
-          ))}
+          {ayat.map(ayah => {
+            const isFocus = !!focus && loadedSurah === focus.surah && ayah.number === focus.ayah;
+            return (
+              <p key={ayah.number} data-ayah={`${loadedSurah}:${ayah.number}`} className={isFocus ? 'is-focus' : undefined}>
+                {ayah.text}
+                <span className="ayah-number"> ﴿{toArabicDigits(ayah.number)}﴾</span>
+              </p>
+            );
+          })}
         </div>
       </section>
     </details>

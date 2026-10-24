@@ -1,4 +1,4 @@
-const CACHE_NAME = "wird-v8";
+const CACHE_NAME = "wird-v9";
 const PRECACHE = [
   "./",
   "./index.html",

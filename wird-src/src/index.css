@@ -447,6 +447,10 @@ svg { flex-shrink: 0; }
 .backup-actions .button { font-size: 10px; }
 .danger-text { color: #b1876c; font-size: 10px; }
 .danger-text:hover { color: #9a624b; }
+.build-stamp { font-size: 9.5px; color: #a3ab99; line-height: 1.9; margin-top: 12px; }
+.build-stamp > span { font-family: ui-monospace, monospace; color: #8d9782; }
+[data-theme='dark'] .build-stamp { color: #8c9b8f; }
+[data-theme='dark'] .build-stamp > span { color: #a3b2a3; }
 .confirmation-text { font-size: 12px; line-height: 2.1; color: #909e7f; padding-top: 23px; }
 .confirm-modal { max-width: 450px; }
 
@@ -1572,11 +1576,18 @@ svg { flex-shrink: 0; }
 .surah-step { flex-shrink: 0; width: 36px; height: 38px; display: grid; place-items: center; border: 1px solid #dfe6d5; border-radius: 7px; background: #f7f9f2; color: #6f8557; }
 .surah-step:hover:not(:disabled) { background: #eef3e5; border-color: #b9c9a5; color: #4a6340; }
 .surah-step:disabled { opacity: .35; }
+.warsh-target { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; background: #f2f6e9; border: 1px solid #dfe8d1; border-radius: 8px; padding: 8px 11px; margin-bottom: 10px; font-size: 11px; color: #5c7643; }
+.warsh-target > svg { color: #8aa06e; }
+.warsh-target > span { flex: 1; min-width: 0; }
+.warsh-target-go { background: #fffefa; border: 1px solid #cfdcbe; border-radius: 6px; padding: 5px 10px; font-size: 10.5px; font-weight: 600; color: #4a6340; white-space: nowrap; }
+.warsh-target-go:hover { background: #eaf1df; border-color: #b3c69c; }
 .warsh-surah-name { font-family: 'Noto Naskh Arabic', serif; font-size: 22px; font-weight: 600; color: #2d4635; text-align: center; margin: 6px 0 2px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .warsh-surah-name > small { font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 10px; font-weight: 400; color: #8a9580; }
 .warsh-status { font-size: 11px; color: #8a9a80; min-height: 20px; line-height: 1.9; }
 .warsh-ayat { font-size: 1.45rem; line-height: 2.3; font-family: 'Noto Naskh Arabic', serif; color: #2e3e32; background: #fffefa; border: 1px solid #ecefe3; border-radius: 8px; padding: 14px 16px; max-height: 420px; overflow-y: auto; }
-.warsh-ayat p { margin: 0 0 .6em; }
+.warsh-ayat p { margin: 0 0 .6em; padding: 2px 4px; border-radius: 5px; scroll-margin-top: 6px; }
+.warsh-ayat p.is-focus { background: #f4f1e2; box-shadow: inset 3px 0 0 #c9a45c; }
+[data-theme='dark'] .warsh-ayat p.is-focus { background: #221f14; box-shadow: inset 3px 0 0 #c9a45c; }
 .warsh-ayat p:last-child { margin-bottom: 0; }
 .warsh-ayat .basmala { text-align: center; }
 .warsh-ayat .ayah-number { color: #54765a; font-size: .7em; white-space: nowrap; }
@@ -1590,6 +1601,10 @@ svg { flex-shrink: 0; }
 [data-theme='dark'] .surah-step { background: #16241c; border-color: #2a4535; color: #a8d4b2; }
 [data-theme='dark'] .surah-step:hover:not(:disabled) { background: #1e3226; border-color: #4a7a58; color: #c5dcc8; }
 [data-theme='dark'] .warsh-surah-name > small { color: #96a597; }
+[data-theme='dark'] .warsh-target { background: #16241c; border-color: #2a4535; color: #a8d4b2; }
+[data-theme='dark'] .warsh-target > svg { color: #8fbf9a; }
+[data-theme='dark'] .warsh-target-go { background: #1e3226; border-color: #4a7a58; color: #c5dcc8; }
+[data-theme='dark'] .warsh-target-go:hover { background: #26402f; }
 [data-theme='dark'] .warsh-surah-name { color: #c5dcc8; }
 [data-theme='dark'] .warsh-status { color: #96a597; }
 [data-theme='dark'] .warsh-ayat { background: #0f1813; border-color: #24352b; color: #d7e0d4; }
