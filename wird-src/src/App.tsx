@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import {
   ArrowLeft, Bell, Bookmark, BookOpen, CalendarDays, ChartNoAxesCombined, Check,
-  CheckCheck, ChevronLeft, ChevronRight, CircleCheck, Clock3, Flower2, Heart,
+  CheckCheck, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, Clock3, Flower2, Heart,
   Layers3, Leaf, Link2, LockKeyhole, Mic, Moon, Pause, Play, Plus, RefreshCw, RotateCcw,
   Route, Settings2, ShieldCheck, Sparkles, Sprout, Sun, Trash2, X,
   type LucideIcon,
@@ -15,9 +15,10 @@ import {
   type DayRecord, type Difficulty, type Mistake, type MistakeKind, type NearMark, type Page,
   type Settings, type TaskId, type TrackerState,
 } from './lib/tracker';
-import { HIZBS, fromThumnId, pathHizbToMushaf, thumnPage } from './data/quran';
+import { HIZBS, SURAHS, fromThumnId, pathHizbToMushaf, thumnPage } from './data/quran';
 import WarshReader from './components/WarshReader';
 import { TodayHero } from './components/NextStep';
+import { Guide } from './components/Guide';
 import { REMINDER_ANCHORS } from './lib/tracker';
 import { useSessionTimer, useTimerSeconds, type SessionTimer } from './lib/sessionTimer';
 import { markBackupDone, saveItem, shareOrDownload, shouldNudgeBackup } from './lib/storage';
@@ -85,6 +86,7 @@ export default function App() {
   const [mistakeOpen, setMistakeOpen] = useState(false);
   const [editingMistake, setEditingMistake] = useState<Mistake | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [storageError, setStorageError] = useState(false);
@@ -112,7 +114,7 @@ export default function App() {
   const required = requiredReads(state, selectedDate, record.difficulty);
   const isFirstAppDay = state.settings.startedAt === selectedDate && !Object.keys(state.records).some(d => d < selectedDate);
   const coachTips = buildCoachTips(state, today, due.length);
-  const sessionVisible = !!session && !mistakeOpen && !settingsOpen && !confirmation;
+  const sessionVisible = !!session && !mistakeOpen && !settingsOpen && !helpOpen && !confirmation;
 
   const { hint: readHint, setHint: setReadHint, tryRead } = useReadGate(record.lastReadAt);
 
@@ -498,15 +500,18 @@ export default function App() {
     setConfirmation(null);
   }
 
+  /** One short locator: hizb · thumn · surah · page. Replaces the duplicated unit text. */
+  function unitWhere(unit: number) {
+    const safe = Math.min(480, Math.max(1, unit));
+    const { hizb, thumn } = fromThumnId(safe);
+    const surah = SURAHS[HIZBS[hizb - 1]?.surah ?? 1];
+    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · من سورة ${surah} · ص ${ar(thumnPage(safe))}`;
+  }
+
   function taskDescription(task: TaskId): string {
     switch (task) {
-      case 'yesterday': return unitLabel(plan.units);
-      case 'new': {
-        const unit = plan.units + 1;
-        const { hizb, thumn } = fromThumnId(Math.min(480, unit));
-        const where = `${unitLabel(unit)} · ص ${ar(thumnPage(unit))} · الحزب ${ar(hizb)} ثمن ${ar(thumn)}`;
-        return plan.newHalf ? `الحد الأدنى: نصف صفحة من ${where}` : where;
-      }
+      case 'yesterday': return unitWhere(plan.units);
+      case 'new': return plan.newHalf ? `الحد الأدنى: نصف صفحة — ${unitWhere(plan.units + 1)}` : unitWhere(plan.units + 1);
       case 'near': return `${nearLabel(plan)} · ${ar(plan.nearThumns.length)} أثمان`;
       case 'far': {
         const span = farSpanLabel(plan);
@@ -602,13 +607,13 @@ export default function App() {
       <div className="sidebar-nav-label">مساحتك مع القرآن</div>
       <nav className="desktop-nav">{NAVIGATION.map(item => <button key={item.id} onClick={() => { if (item.id === 'today') openDate(today); else navigate(item.id); }} className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined}><item.icon size={21} strokeWidth={1.6} /><span>{item.label}</span>{item.id === 'mistakes' && due.length > 0 && <span className="nav-count">{ar(due.length)}</span>}{page === item.id && <span className="active-nav-dot" />}</button>)}</nav>
       <div className="sidebar-verse"><LeafDrawing /><p>وَلَقَدْ يَسَّرْنَا الْقُرْآنَ<br />لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ</p><span>سورة القمر، الآية ١٧</span></div>
-      <div className="sidebar-footer"><button className="nav-item" onClick={() => setSettingsOpen(true)}><Settings2 size={20} strokeWidth={1.6} /><span>الإعدادات</span></button><div className={`storage-status ${storageError ? 'storage-error' : ''}`}><span />{storageError ? 'تعذّر الحفظ على المتصفح' : 'محفوظ على جهازك، لك وحدك'}<ShieldCheck size={13} /></div></div>
+      <div className="sidebar-footer"><button className="nav-item" onClick={() => setHelpOpen(true)}><CircleHelp size={20} strokeWidth={1.6} /><span>كيف يعمل وِرد؟</span></button><button className="nav-item" onClick={() => setSettingsOpen(true)}><Settings2 size={20} strokeWidth={1.6} /><span>الإعدادات</span></button><div className={`storage-status ${storageError ? 'storage-error' : ''}`}><span />{storageError ? 'تعذّر الحفظ على المتصفح' : 'محفوظ على جهازك، لك وحدك'}<ShieldCheck size={13} /></div></div>
     </aside>
 
-    <div className="mobile-topbar"><button className="brand-button" onClick={() => openDate(today)}><Brand small /></button><div className="mobile-top-actions"><button className="icon-button" aria-label="تبديل المظهر" onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button><button className="icon-button" aria-label="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings2 size={20} /></button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" aria-expanded={notificationsOpen}><Bell size={20} />{due.length > 0 && <i />}</button></div></div>
+    <div className="mobile-topbar"><button className="brand-button" onClick={() => openDate(today)}><Brand small /></button><div className="mobile-top-actions"><button className="icon-button" aria-label="تبديل المظهر" title={state.settings.theme === 'light' ? 'المظهر الداكن' : 'المظهر الفاتح'} onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button><button className="icon-button" aria-label="الإعدادات" title="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings2 size={20} /></button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" title="رسائل وتذكير" aria-expanded={notificationsOpen}><Bell size={20} />{due.length > 0 && <i />}</button></div></div>
 
     <main className="main-content" id="main-content">
-      <div className={`desktop-utility ${page === 'today' ? 'utility-today' : ''}`}><div className="date-display"><CalendarDays size={19} strokeWidth={1.5} /><div><strong>{formatDate(selectedDate)}</strong><span>{hijriDate(selectedDate)}</span></div></div><button className="icon-button" aria-label="تبديل المظهر" onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" aria-expanded={notificationsOpen}><Bell size={20} strokeWidth={1.5} />{due.length > 0 && <i />}</button></div>
+      <div className={`desktop-utility ${page === 'today' ? 'utility-today' : ''}`}><div className="date-display"><CalendarDays size={19} strokeWidth={1.5} /><div><strong>{formatDate(selectedDate)}</strong><span>{hijriDate(selectedDate)}</span></div></div><button className="icon-button" aria-label="تبديل المظهر" title={state.settings.theme === 'light' ? 'المظهر الداكن' : 'المظهر الفاتح'} onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" title="رسائل وتذكير" aria-expanded={notificationsOpen}><Bell size={20} strokeWidth={1.5} />{due.length > 0 && <i />}</button></div>
       <AnimatePresence mode="wait">
         <motion.div key={page} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.22 }}>
           {page === 'today' && <div className="today-page">
@@ -673,10 +678,10 @@ export default function App() {
 
     <nav className="mobile-nav" aria-label="التنقل الرئيسي">{NAVIGATION.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => item.id === 'today' ? openDate(today) : navigate(item.id)}><item.icon size={21} strokeWidth={page === item.id ? 1.9 : 1.6} /><span>{item.mobileLabel}</span>{page === item.id && <motion.i layoutId="mobile-nav-indicator" />}</button>)}</nav>
 
-    <AnimatePresence>{notificationsOpen && <><motion.div className="popover-dismiss" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotificationsOpen(false)} /><motion.div className="notifications-popover" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><div className="section-heading"><h2>رسائل لطيفة</h2><button className="icon-button tiny-icon-button" aria-label="إغلاق الإشعارات" onClick={() => setNotificationsOpen(false)}><X size={17} /></button></div><button className="notification-item" onClick={() => openDate(today)}><Sun size={22} /><div><strong>{isDayComplete(state.records[today]) ? 'وردك اكتمل، تقبّل الله منك' : 'موعدك مع الآيات ينتظرك'}</strong><p>{isDayComplete(state.records[today]) ? 'نسأل الله أن يجعل القرآن نورًا لقلبك.' : 'لا تحتاج وقتًا مثاليًا، فقط خطوة تبدأ بها.'}</p></div></button>{due.length > 0 && <button className="notification-item" onClick={() => navigate('mistakes')}><Bookmark size={21} /><div><strong>{ar(due.length)} مواضع تحتاج عناية</strong><p>مراجعة إضافية قصيرة، لحفظ أكثر رسوخًا.</p></div></button>}<div className="notification-reminder"><span>{state.settings.reminderEnabled ? `التذكير اليومي: ${state.settings.reminderTime}` : 'تذكير هادئ، في وقت تختاره'}</span><button className="text-button" onClick={() => { setNotificationsOpen(false); setSettingsOpen(true); }}>{state.settings.reminderEnabled ? 'تعديل' : 'تفعيل'} <ArrowLeft size={13} /></button></div></motion.div></>}</AnimatePresence>
+    <AnimatePresence>{notificationsOpen && <><motion.div className="popover-dismiss" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotificationsOpen(false)} /><motion.div className="notifications-popover" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><div className="section-heading"><h2>رسائل لطيفة</h2><button className="icon-button tiny-icon-button" aria-label="إغلاق الإشعارات" onClick={() => setNotificationsOpen(false)}><X size={17} /></button></div><button className="notification-item" onClick={() => openDate(today)}><Sun size={22} /><div><strong>{isDayComplete(state.records[today]) ? 'وردك اكتمل، تقبّل الله منك' : 'موعدك مع الآيات ينتظرك'}</strong><p>{isDayComplete(state.records[today]) ? 'نسأل الله أن يجعل القرآن نورًا لقلبك.' : 'لا تحتاج وقتًا مثاليًا، فقط خطوة تبدأ بها.'}</p></div></button>{due.length > 0 && <button className="notification-item" onClick={() => navigate('mistakes')}><Bookmark size={21} /><div><strong>{ar(due.length)} مواضع تحتاج عناية</strong><p>مراجعة إضافية قصيرة، لحفظ أكثر رسوخًا.</p></div></button>}<div className="notification-reminder"><span>{state.settings.reminderEnabled ? `التذكير اليومي: ${state.settings.reminderTime}` : 'تذكير هادئ، في وقت تختاره'}</span><button className="text-button" onClick={() => { setNotificationsOpen(false); setSettingsOpen(true); }}>{state.settings.reminderEnabled ? 'تعديل' : 'تفعيل'} <ArrowLeft size={13} /></button></div><button className="notification-guide" onClick={() => { setNotificationsOpen(false); setHelpOpen(true); }}><CircleHelp size={17} /><span>كيف يعمل وِرد؟ دليل قصير</span><ArrowLeft size={14} /></button></motion.div></>}</AnimatePresence>
 
     <AnimatePresence mode="wait">
-      {session && !mistakeOpen && <Modal key={`session-${session}`} title={TASK_NAMES[session]} subtitle={taskDescription(session)} icon={<SessionIcon size={23} />} onClose={closeSession} className="session-modal">
+      {session && !mistakeOpen && !helpOpen && <Modal key={`session-${session}`} title={TASK_NAMES[session]} subtitle={taskDescription(session)} icon={<SessionIcon size={23} />} onClose={closeSession} className="session-modal">
         {sessionDone ? <div className="completed-session"><div className="completed-seal"><CheckCheck size={37} strokeWidth={1.4} /></div><h3>تمّ بحمد الله</h3><p>خطوة أتممتها، وأثر بقي في قلبك.</p><button className="button button-primary" onClick={closeSession}>العودة إلى وردي <ArrowLeft size={17} /></button><button className="text-button muted-button" onClick={reopenTask}><RotateCcw size={14} /> تراجُع عن إتمام هذه الخطوة</button></div> : <>
           <div className="session-timer"><div><span><Leaf size={15} /> مساحة للتفرّغ</span><small>اترك العجلة خارج هذه اللحظة.</small></div><div className="timer-controls"><strong dir="ltr" aria-live="off"><TimerText timer={timer} /></strong><button className={`icon-button timer-play ${timer.running ? 'running' : ''}`} onClick={timer.toggle} aria-label={timer.running ? 'إيقاف المؤقت مؤقتًا' : 'تشغيل مؤقت التفرغ'}>{timer.running ? <Pause size={16} /> : <Play size={16} />}</button><button className="icon-button" aria-label="إعادة ضبط المؤقت" onClick={timer.reset}><RotateCcw size={16} /></button></div></div>
           <SessionRecorder date={selectedDate} task={session} />
@@ -716,6 +721,7 @@ export default function App() {
       </Modal>}
       {mistakeOpen && <Modal key="mistake" title={editingMistake ? 'عناية بموضع التثبيت' : 'موضع يحتاج قليلًا من العناية'} subtitle="سجّله الآن، ليكون أقرب إلى الإتقان غدًا." icon={<Bookmark size={22} />} onClose={() => setMistakeOpen(false)}><MistakeForm existing={editingMistake} defaultHizb={currentHizb} onSave={saveMistake} onCancel={() => setMistakeOpen(false)} /></Modal>}
       {celebrateHizb !== null && <Modal key="celebrate" title={celebrateHizb <= 1 ? 'مبارك! ختمت محفوظك' : `مبارك! أتممت الحزب ${ar(celebrateHizb)}`} subtitle={celebrateHizb <= 1 ? 'اللهم اجعله حجة لك لا عليك.' : 'تنتقل الطبقات تلقائيًا ابتداءً من الغد.'} icon={<Sparkles size={22} />} onClose={() => setCelebrateHizb(null)} className="confirm-modal"><p className="confirmation-text">{celebrateHizb <= 1 ? 'وصلت إلى الفاتحة. الحمد لله — ثباتك هو الفوز.' : `حفظك ينمو. الحمد لله — انتقلت إلى الحزب ${ar(celebrateHizb - 1)} بإذن الله. أكمل بهدوء، فالثبات أهم من العجلة.`}</p><div className="modal-footer"><button className="button button-primary" onClick={() => setCelebrateHizb(null)}>الحمد لله، متابعة</button></div></Modal>}
+      {helpOpen && <Modal key="guide" title="كيف يعمل وِرد؟" subtitle="ترتيب يومك، وثلاث طبقات، ومعيار واحد." icon={<CircleHelp size={22} />} onClose={() => setHelpOpen(false)} className="guide-modal"><Guide /></Modal>}
       {settingsOpen && <Modal key="settings" title="على قدر خطاك" subtitle="خطة مرنة، وإعدادات تشبه يومك." icon={<Settings2 size={22} />} onClose={() => setSettingsOpen(false)} className="settings-modal"><SettingsForm state={state} onSave={saveSettings} onExport={exportData} onImport={importData} onReset={() => { setSettingsOpen(false); setConfirmation({ type: 'reset' }); }} /></Modal>}
       {confirmation && <Modal key="confirmation" title={confirmation.type === 'delete' ? 'هل تحذف هذا الموضع؟' : confirmation.type === 'reset' ? 'صفحة جديدة في رحلتك؟' : 'هل تستعيد هذه النسخة؟'} icon={confirmation.type === 'delete' ? <Trash2 size={22} /> : <RefreshCw size={22} />} onClose={() => setConfirmation(null)} className="confirm-modal"><p className="confirmation-text">{confirmation.type === 'delete' ? 'سيُحذف من قائمة التثبيت. لن تتأثر بقية خطتك أو إنجازاتك.' : confirmation.type === 'reset' ? 'سيُحذف سجلّ الإنجاز ومواضع التثبيت من هذا الجهاز. صدّر نسخة أولًا إن أردت الاحتفاظ بها.' : 'ستُستبدل بيانات هذا المتصفح بالخطة والسجلّ الموجودين في النسخة. يمكنك إلغاء العملية لتصدير بياناتك الحالية أولًا.'}</p><div className="modal-footer"><button className={`button ${confirmation.type === 'import' ? 'button-primary' : 'button-danger'}`} onClick={confirmAction}>{confirmation.type === 'delete' ? 'نعم، احذف الموضع' : confirmation.type === 'reset' ? 'ابدأ رحلة جديدة' : 'استعادة النسخة'}</button><button className="button button-ghost" onClick={() => setConfirmation(null)}>إلغاء</button></div></Modal>}
     </AnimatePresence>

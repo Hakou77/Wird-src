@@ -401,6 +401,8 @@ svg { flex-shrink: 0; }
 .add-mistake-link > svg:last-child { margin-inline-start: auto; }
 .add-mistake-link:hover { background: #f3f6ed; border-color: #b8c5a5; }
 .session-footer { border-top: 1px solid var(--border); margin-top: 23px; padding-top: 21px; text-align: center; }
+/* The finish action stays reachable while the session sheet scrolls. */
+.session-modal .session-footer { position: sticky; bottom: -25px; z-index: 3; background: #fffefa; margin: 22px -25px -25px; padding: 14px 25px 25px; border-top: 1px solid var(--border); }
 .session-footer > .button { width: 100%; min-height: 44px; font-size: 12px; }
 .session-footer > .text-button { font-size: 10px; margin-top: 11px; }
 .session-hint { font-size: 10.5px; color: #a3a894; line-height: 1.9; margin-top: 10px; }
@@ -740,6 +742,7 @@ svg { flex-shrink: 0; }
   .step-text > small { font-size: 11px; }
   .step-checkbox { width: 24px; height: 24px; }
   .session-footer > .button { min-height: 47px; }
+  .session-modal .session-footer { bottom: calc(-1 * max(24px, env(safe-area-inset-bottom))); margin: 18px -21px calc(-1 * max(24px, env(safe-area-inset-bottom))); padding: 13px 21px max(24px, env(safe-area-inset-bottom)); }
   .session-footer > .text-button { font-size: 11px; min-height: 36px; margin-top: 8px; }
   .field-label > input, .field-label > select, .field-label > textarea { font-size: 16px; min-height: 46px; padding-inline: 10px; }
   .field-label > input::placeholder, .field-label > textarea::placeholder { font-size: 12px; }
@@ -824,6 +827,48 @@ svg { flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* ===== Quick guide ===== */
+.guide-modal { width: 560px; }
+.guide { padding-top: 4px; }
+.guide-block { padding: 18px 0; border-bottom: 1px solid var(--border); }
+.guide-block:last-child { border-bottom: 0; padding-bottom: 4px; }
+.guide-block > h3 { font-size: 13.5px; font-weight: 600; color: #4a6340; margin-bottom: 5px; }
+.guide-block > p { font-size: 11px; color: #78856c; line-height: 1.95; }
+.guide-order { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.guide-order > li { display: flex; align-items: center; gap: 8px; background: #f4f7ee; border: 1px solid #e3e9d9; border-radius: 9px; padding: 8px 10px; min-width: 0; }
+.guide-step-num { width: 21px; height: 21px; border-radius: 50%; background: #e2ead7; color: #5c7545; display: grid; place-items: center; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.guide-step-text { display: grid; gap: 1px; }
+.guide-step-text > strong { font-size: 11px; font-weight: 600; color: #465d38; white-space: nowrap; }
+.guide-step-text > small { font-size: 9px; color: #8b9780; white-space: nowrap; }
+.guide-step-arrow { color: #b3bfa3; flex-shrink: 0; }
+.guide-layers { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 11px; }
+.guide-layers > li { display: flex; gap: 11px; align-items: flex-start; }
+.guide-layer-icon { width: 32px; height: 32px; border-radius: 9px; background: #f0f4e8; color: #7c9462; display: grid; place-items: center; flex-shrink: 0; }
+.guide-layers strong { display: block; font-size: 12px; font-weight: 600; color: #465d38; }
+.guide-layers p { font-size: 11px; color: #7b8770; line-height: 1.95; margin-top: 2px; }
+.plan-order { margin: 0 0 10px; }
+.guide-facts { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.guide-facts > li { display: flex; gap: 8px; align-items: flex-start; font-size: 11px; color: #7b8770; line-height: 1.95; }
+.guide-facts > li > svg { margin-top: 3px; color: #93a97c; flex-shrink: 0; }
+.notification-guide { display: flex; align-items: center; gap: 9px; width: 100%; background: #f6f8f0; border: 1px solid #e6ebdc; border-radius: 8px; padding: 10px 12px; margin-top: 14px; color: #6b8254; font-size: 11px; font-weight: 500; text-align: start; }
+.notification-guide > span { flex: 1; }
+.notification-guide:hover { background: #eef3e5; border-color: #ced9bd; }
+[data-theme='dark'] .guide-block { border-color: #24352b; }
+[data-theme='dark'] .guide-block > h3 { color: #a8d4b2; }
+[data-theme='dark'] .guide-block > p, [data-theme='dark'] .guide-layers p, [data-theme='dark'] .guide-facts > li { color: #a3b2a3; }
+[data-theme='dark'] .guide-order > li { background: #16241c; border-color: #2a4535; }
+[data-theme='dark'] .guide-step-num { background: #1e3226; color: #a8d4b2; }
+[data-theme='dark'] .guide-step-text > strong, [data-theme='dark'] .guide-layers strong { color: #c5dcc8; }
+[data-theme='dark'] .guide-step-text > small { color: #96a597; }
+[data-theme='dark'] .guide-layer-icon { background: #1a2e20; color: #8fbf9a; }
+[data-theme='dark'] .notification-guide { background: #16241c; border-color: #2a4535; color: #8fbf9a; }
+[data-theme='dark'] .notification-guide:hover { background: #1e3226; border-color: #4a7a58; }
+@media (max-width: 760px) {
+  .guide-order > li { flex: 1 1 100%; }
+  .guide-step-arrow { display: none; }
+  .guide-step-text > strong, .guide-step-text > small { white-space: normal; }
 }
 
 /* ===== Scientific reads, near grid, cycle, path map, onboarding ===== */
@@ -1172,6 +1217,7 @@ svg { flex-shrink: 0; }
 [data-theme='dark'] .add-mistake-link { border-color: #2a4535; color: #96a597; }
 [data-theme='dark'] .add-mistake-link:hover { background: #17241c; }
 [data-theme='dark'] .session-footer, [data-theme='dark'] .modal-footer, [data-theme='dark'] .data-section { border-color: #24352b; }
+[data-theme='dark'] .session-modal .session-footer { background: #131f18; }
 [data-theme='dark'] .session-hint { color: #96a597; }
 [data-theme='dark'] .completed-session h3 { color: #8fbf9a; }
 [data-theme='dark'] .completed-session p { color: #96a597; }
@@ -1517,11 +1563,17 @@ svg { flex-shrink: 0; }
 .mushaf-details[open] > summary { border-bottom: 1px solid var(--border); background: #f0f4e8; }
 .warsh-reader { max-width: 800px; margin: auto; padding: 14px 15px 16px; }
 .warsh-hint { font-size: 10px; color: var(--muted); line-height: 1.9; margin-bottom: 10px; }
-.warsh-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.warsh-order { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #86907a; margin-bottom: 10px; }
+.warsh-order > svg { color: #a2ac92; }
+.warsh-controls { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 10px; }
 .warsh-controls > label { font-size: 11px; color: #6b8254; font-weight: 600; }
-.warsh-controls > input[type='number'] { width: 76px; border: 1px solid #dfe6d5; border-radius: 7px; padding: 8px 10px; font-size: 14px; color: #4a6340; background: #fffefa; }
-.warsh-controls > select { flex: 1; min-width: 150px; border: 1px solid #dfe6d5; border-radius: 7px; padding: 8px 10px; font-size: 12px; color: #4a6340; background: #fffefa; }
-.warsh-surah-name { font-family: 'Noto Naskh Arabic', serif; font-size: 22px; font-weight: 600; color: #2d4635; text-align: center; margin: 6px 0 2px; }
+.surah-nav { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.surah-nav > select { flex: 1; min-width: 0; border: 1px solid #dfe6d5; border-radius: 7px; padding: 8px 10px; font-size: 12px; color: #4a6340; background: #fffefa; min-height: 38px; }
+.surah-step { flex-shrink: 0; width: 36px; height: 38px; display: grid; place-items: center; border: 1px solid #dfe6d5; border-radius: 7px; background: #f7f9f2; color: #6f8557; }
+.surah-step:hover:not(:disabled) { background: #eef3e5; border-color: #b9c9a5; color: #4a6340; }
+.surah-step:disabled { opacity: .35; }
+.warsh-surah-name { font-family: 'Noto Naskh Arabic', serif; font-size: 22px; font-weight: 600; color: #2d4635; text-align: center; margin: 6px 0 2px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.warsh-surah-name > small { font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 10px; font-weight: 400; color: #8a9580; }
 .warsh-status { font-size: 11px; color: #8a9a80; min-height: 20px; line-height: 1.9; }
 .warsh-ayat { font-size: 1.45rem; line-height: 2.3; font-family: 'Noto Naskh Arabic', serif; color: #2e3e32; background: #fffefa; border: 1px solid #ecefe3; border-radius: 8px; padding: 14px 16px; max-height: 420px; overflow-y: auto; }
 .warsh-ayat p { margin: 0 0 .6em; }
@@ -1533,7 +1585,11 @@ svg { flex-shrink: 0; }
 [data-theme='dark'] .mushaf-details > summary { color: #a8d4b2; }
 [data-theme='dark'] .mushaf-details > summary:hover, [data-theme='dark'] .mushaf-details[open] > summary { background: #17241c; }
 [data-theme='dark'] .warsh-controls > label { color: #8fbf9a; }
-[data-theme='dark'] .warsh-controls > input[type='number'], [data-theme='dark'] .warsh-controls > select { background: #16241c; border-color: #2a4535; color: #a5bfaa; }
+[data-theme='dark'] .warsh-order { color: #96a597; }
+[data-theme='dark'] .surah-nav > select { background: #16241c; border-color: #2a4535; color: #a5bfaa; }
+[data-theme='dark'] .surah-step { background: #16241c; border-color: #2a4535; color: #a8d4b2; }
+[data-theme='dark'] .surah-step:hover:not(:disabled) { background: #1e3226; border-color: #4a7a58; color: #c5dcc8; }
+[data-theme='dark'] .warsh-surah-name > small { color: #96a597; }
 [data-theme='dark'] .warsh-surah-name { color: #c5dcc8; }
 [data-theme='dark'] .warsh-status { color: #96a597; }
 [data-theme='dark'] .warsh-ayat { background: #0f1813; border-color: #24352b; color: #d7e0d4; }

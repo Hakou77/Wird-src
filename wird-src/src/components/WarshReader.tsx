@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { BookOpen } from 'lucide-react';
-import { SURAHS, toAr } from '../data/quran';
+import { BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { SURAHS, SURAHS_BY_PATH, TOTAL_SURAHS, surahPathIndex, toAr } from '../data/quran';
 
 type Ayah = { number: number; text: string };
 type MushafMeta = { bismillah: string; font_file: string | null };
@@ -100,15 +100,17 @@ export default function WarshReader({
   defaultSurah,
   title = 'نص المصحف برواية ورش',
   hint = 'يتطلب الاتصال أول مرة، ثم تُحفظ السورة على جهازك للمراجعة دون اتصال.',
+  orderHint = 'السور مرتّبة على رحلة حفظك: من الناس إلى الفاتحة.',
   defaultOpen = false,
 }: {
   defaultSurah: number;
   title?: string;
   hint?: string;
+  orderHint?: string;
   defaultOpen?: boolean;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const [surahInput, setSurahInput] = useState(() => String(Math.min(114, Math.max(1, defaultSurah || 1))));
+  const [surahInput, setSurahInput] = useState(() => String(Math.min(TOTAL_SURAHS, Math.max(1, defaultSurah || 1))));
   const [ayat, setAyat] = useState<Ayah[]>([]);
   const [basmala, setBasmala] = useState<string>(WARSH_FALLBACK_BISMILLAH);
   const [status, setStatus] = useState('');
@@ -117,8 +119,8 @@ export default function WarshReader({
   const requestId = useRef(0);
 
   const showSurah = useCallback(async (wanted: number) => {
-    if (!Number.isInteger(wanted) || wanted < 1 || wanted > 114) {
-      setStatus('أدخل رقم سورة من 1 إلى 114.');
+    if (!Number.isInteger(wanted) || wanted < 1 || wanted > TOTAL_SURAHS) {
+      setStatus(`اختر سورة بين ${toAr(1)} و${toAr(TOTAL_SURAHS)}.`);
       return;
     }
     const current = ++requestId.current;
@@ -166,13 +168,20 @@ export default function WarshReader({
 
   // حمّل السورة المبدئية مرة واحدة، وأعد التحميل إذا تغيّر الثمن المستهدف.
   useEffect(() => {
-    const safe = Math.min(114, Math.max(1, defaultSurah || 1));
+    const safe = Math.min(TOTAL_SURAHS, Math.max(1, defaultSurah || 1));
     setSurahInput(String(safe));
     void showSurah(safe);
   }, [defaultSurah, showSurah]);
 
   const surahNumber = Number(surahInput);
-  const surahName = surahNumber >= 1 && surahNumber <= 114 ? SURAHS[surahNumber] : '';
+  const surahName = surahNumber >= 1 && surahNumber <= TOTAL_SURAHS ? SURAHS[surahNumber] : '';
+
+  /** Jump to a surah and load it right away — one tap instead of pick-then-confirm. */
+  const go = useCallback((wanted: number) => {
+    const safe = Math.min(TOTAL_SURAHS, Math.max(1, wanted));
+    setSurahInput(String(safe));
+    void showSurah(safe);
+  }, [showSurah]);
 
   const showBasmala =
     loadedSurah !== null && loadedSurah !== 9 && loadedSurah !== 1 && basmala && ayat.length > 0 && !ayat[0].text.startsWith(basmala);
@@ -186,41 +195,57 @@ export default function WarshReader({
       </summary>
       <section id={`warsh-reader-${uid}`} dir="rtl" lang="ar" className="warsh-reader" aria-label={title}>
         <p className="warsh-hint">{hint}</p>
+        <p className="warsh-order"><ChevronLeft size={13} /> {orderHint}</p>
         <div className="warsh-controls">
-          <label htmlFor={`warsh-surah-${uid}`}>رقم السورة:</label>
-          <input
-            id={`warsh-surah-${uid}`}
-            type="number"
-            min={1}
-            max={114}
-            value={surahInput}
-            onChange={event => setSurahInput(event.target.value)}
-          />
-          <select
-            aria-label="اختر السورة بالاسم"
-            value={Number.isInteger(surahNumber) && surahNumber >= 1 && surahNumber <= 114 ? surahNumber : ''}
-            onChange={event => {
-              setSurahInput(event.target.value);
-              const next = Number(event.target.value);
-              if (Number.isInteger(next)) void showSurah(next);
-            }}
-          >
-            <option value="" disabled>
-              اختر السورة
-            </option>
-            {SURAHS.map((name, index) =>
-              index === 0 ? null : (
-                <option key={index} value={index}>
-                  {index} · {name}
+          <label htmlFor={`warsh-surah-${uid}`}>السورة</label>
+          <div className="surah-nav">
+            <button
+              type="button"
+              className="surah-step"
+              aria-label="السورة السابقة في رحلة حفظك"
+              title="السابقة في رحلة حفظك"
+              disabled={!(surahNumber >= 1 && surahNumber < TOTAL_SURAHS)}
+              onClick={() => go(surahNumber + 1)}
+            >
+              <ChevronRight size={17} />
+            </button>
+            <select
+              id={`warsh-surah-${uid}`}
+              aria-label="اختر السورة"
+              value={Number.isInteger(surahNumber) && surahNumber >= 1 && surahNumber <= TOTAL_SURAHS ? surahNumber : ''}
+              onChange={event => {
+                const next = Number(event.target.value);
+                if (Number.isInteger(next)) go(next);
+                else setSurahInput(event.target.value);
+              }}
+            >
+              <option value="" disabled>
+                اختر السورة
+              </option>
+              {SURAHS_BY_PATH.map(item => (
+                <option key={item.number} value={item.number}>
+                  {toAr(item.number)} · {item.name}
                 </option>
-              ),
-            )}
-          </select>
-          <button id={`warsh-show-${uid}`} type="button" className="button button-outline button-small" onClick={() => void showSurah(Number(surahInput))}>
-            عرض السورة
-          </button>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="surah-step"
+              aria-label="السورة التالية في رحلة حفظك"
+              title="التالية في رحلة حفظك"
+              disabled={!(surahNumber > 1)}
+              onClick={() => go(surahNumber - 1)}
+            >
+              <ChevronLeft size={17} />
+            </button>
+          </div>
         </div>
-        {surahName && loadedSurah === surahNumber && <h4 className="warsh-surah-name">سورة {surahName}</h4>}
+        {surahName && loadedSurah === surahNumber && (
+          <h4 className="warsh-surah-name">
+            سورة {surahName}
+            <small>الموضع {toAr(surahPathIndex(surahNumber))} من {toAr(TOTAL_SURAHS)} في رحلتك</small>
+          </h4>
+        )}
         <p id={`warsh-status-${uid}`} role="status" className="warsh-status">
           {status}
         </p>

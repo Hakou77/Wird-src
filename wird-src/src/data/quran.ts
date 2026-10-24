@@ -191,6 +191,7 @@ export const HIZBS: Hizb[] = [
 
 export const THUMNS_PER_HIZB = 8;
 export const TOTAL_HIZBS = 60;
+export const TOTAL_SURAHS = 114;
 export const TOTAL_THUMNS = 480;
 export const LAST_PAGE = 604;
 
@@ -224,6 +225,20 @@ export function thumnPage(id: number): number {
   const { start, pages } = hizbPageSpan(hizb);
   const offset = Math.round(((thumn - 1) * pages) / THUMNS_PER_HIZB);
   return Math.min(start + offset, LAST_PAGE);
+}
+
+/**
+ * ترتيب الحفظ في رواية ورش: من سورة الناس (١١٤) نزولًا إلى الفاتحة (١).
+ * تُعرض السور في القوائم بهذا الترتيب ليطابق اتجاه الورد، لا ترتيب المصحف.
+ */
+export const SURAHS_BY_PATH: { number: number; name: string }[] = SURAHS
+  .map((name, number) => ({ name, number }))
+  .filter(item => item.number >= 1)
+  .reverse();
+
+/** موضع السورة في رحلة الحفظ: الفاتحة آخرًا (١١٤)، والناس أولًا (١). */
+export function surahPathIndex(surah: number): number {
+  return TOTAL_SURAHS + 1 - surah;
 }
 
 export function hizbLabel(hizb: number): string {

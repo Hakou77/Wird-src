@@ -10,9 +10,10 @@ import {
   isDayComplete, normalizeArabic, ordinal, rhythmLast7, totalUnits, MISTAKE_KINDS, WEEKDAYS,
   type Mistake, type MistakeKind, type Settings, type ThemeName, type TrackerState,
 } from '../lib/tracker';
-import { RULES, SURAHS, hizbLabel } from '../data/quran';
+import { RULES, SURAHS_BY_PATH, hizbLabel } from '../data/quran';
 import { EmptyState } from './Shared';
 import { PathMap, ReadingStats } from './SessionExtras';
+import { DAILY_ORDER } from './Guide';
 
 export function PlanPage({ state, today, onEdit, onFarChange }: {
   state: TrackerState; today: string; onEdit: () => void; onFarChange: (amount: 0.5 | 1 | 2) => void;
@@ -30,7 +31,16 @@ export function PlanPage({ state, today, onEdit, onFarChange }: {
         <div className="plan-eighths"><div className="between"><span>الحزب {units >= 480 ? ordinal(1) : ordinal(60 - hizbs)}</span><span>{ar(eighths)} / ٨ أثمان</span></div><div className="eighths-track">{Array.from({ length: 8 }, (_, i) => <span key={i} className={i < eighths ? 'filled' : ''} />)}</div><small>تُضاف الأثمان تلقائيًا عند إتمام الحفظ الجديد.</small></div>
       </section>
 
-      <div className="section-heading"><h2>أساس يومك</h2><span>ثلاث طبقات متكاملة</span></div>
+      <div className="section-heading"><h2>أساس يومك</h2><span>ترتيب ثابت كل يوم</span></div>
+      <ol className="guide-order plan-order" aria-label="ترتيب وردك اليومي">
+        {DAILY_ORDER.map((step, index) => (
+          <li key={step.label}>
+            <span className="guide-step-num">{ar(index + 1)}</span>
+            <span className="guide-step-text"><strong>{step.label}</strong></span>
+            {index < DAILY_ORDER.length - 1 && <ArrowLeft className="guide-step-arrow" size={14} aria-hidden="true" />}
+          </li>
+        ))}
+      </ol>
       <div className="plan-layers">
         <div className="plan-layer"><span className="layer-number">٠١</span><div className="layer-copy"><span className="section-kicker terracotta-text"><BookOpen size={17} /> الحفظ الجديد</span><h3>ثمن واحد، بإتقان.</h3><p>ابدأ بتسميع ثمن الأمس بلا خطأ. اقرأ الجديد ٣ إلى ٥ مرات، ثم احفظه وسمّعه مرتين في اليوم نفسه.</p></div><span className="layer-amount">نحو صفحة وربع<small>كل يوم عدا {WEEKDAYS[state.settings.restDay]}</small></span></div>
         <div className="plan-layer"><span className="layer-number">٠٢</span><div className="layer-copy"><span className="section-kicker"><Layers3 size={17} /> المراجعة القريبة</span><h3>الجديد يحتاج جذورًا.</h3><p>الحزب {ordinal(plan.previousHizb)} كاملًا، وكل ما حفظته من الحزب {ordinal(plan.currentHizb)}. عند إتمام الحزب، تنتقل الطبقات تلقائيًا في الورد التالي.</p></div><span className="layer-amount">آخر حزبين تقريبًا<small>مراجعة يومية للتثبيت</small></span></div>
@@ -137,7 +147,8 @@ export function MistakeForm({ existing, defaultHizb, onSave, onCancel }: {
   const [kind, setKind] = useState<MistakeKind>(existing?.kind || 'stop');
   const [hizb, setHizb] = useState(existing?.hizb || defaultHizb);
   const [error, setError] = useState('');
-  const surahSuggestions = SURAHS.filter(Boolean);
+  // اقتراحات السور بترتيب الحفظ (من الناس إلى الفاتحة)، لا بترتيب المصحف.
+  const surahSuggestions = SURAHS_BY_PATH.map(item => item.name);
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!surah.trim() || !location.trim()) { setError('اكتب اسم السورة والموضع ليكون الرجوع إليه سهلًا.'); return; }
