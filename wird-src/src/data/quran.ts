@@ -116,6 +116,8 @@ export const SURAHS = [
   "الناس",
 ];
 
+import { THUMN_ENDS } from './thumns';
+
 export type Hizb = {
   n: number;
   surah: number;
@@ -191,8 +193,52 @@ export const HIZBS: Hizb[] = [
 
 export const THUMNS_PER_HIZB = 8;
 export const TOTAL_HIZBS = 60;
+export const TOTAL_SURAHS = 114;
 export const TOTAL_THUMNS = 480;
 export const LAST_PAGE = 604;
+
+/**
+ * أين يقع الثمن بالضبط: من السورة والآية إلى السورة والآية.
+ *
+ * الأثمان تُقرأ من جدول ورش المحقَّق (THUMN_ENDS) لا من معادلة تقسيم:
+ * كل ثمن له بداية ونهاية معروفتان، فيطابق النصُّ عنوانَ المهمة تمامًا.
+ */
+export type ThumnPosition = {
+  hizb: number;
+  thumn: number;
+  startSurah: number;
+  startAyah: number;
+  endSurah: number;
+  endAyah: number;
+};
+
+export function thumnPosition(unit: number): ThumnPosition {
+  const safe = Math.min(TOTAL_THUMNS, Math.max(1, unit));
+  const { hizb, thumn } = fromThumnId(safe);
+  const ends = THUMN_ENDS[hizb - 1];
+  const [endSurah, endAyah] = ends[thumn - 1];
+  const previous = thumn > 1 ? ends[thumn - 2] : null;
+  const hizbStart = HIZBS[hizb - 1];
+  return {
+    hizb,
+    thumn,
+    startSurah: previous ? previous[0] : hizbStart.surah,
+    startAyah: previous ? previous[1] + 1 : hizbStart.ayah,
+    endSurah,
+    endAyah,
+  };
+}
+
+/** "الرحمن ٤١–٧٨" أو "البقرة ٢٨٣ – آل عمران ٤" حين يمتد الثمن بين سورتين. */
+export function thumnRangeLabel(unit: number): string {
+  const { startSurah, startAyah, endSurah, endAyah } = thumnPosition(unit);
+  if (startSurah === endSurah) return `${SURAHS[startSurah]} ${toAr(startAyah)}–${toAr(endAyah)}`;
+  return `${SURAHS[startSurah]} ${toAr(startAyah)} – ${SURAHS[endSurah]} ${toAr(endAyah)}`;
+}
+
+export function thumnSurah(unit: number): number {
+  return thumnPosition(unit).startSurah;
+}
 
 export function hizbPageSpan(hizb: number): { start: number; end: number; pages: number } {
   const start = HIZBS[hizb - 1].page;
@@ -224,6 +270,20 @@ export function thumnPage(id: number): number {
   const { start, pages } = hizbPageSpan(hizb);
   const offset = Math.round(((thumn - 1) * pages) / THUMNS_PER_HIZB);
   return Math.min(start + offset, LAST_PAGE);
+}
+
+/**
+ * ترتيب الحفظ في رواية ورش: من سورة الناس (١١٤) نزولًا إلى الفاتحة (١).
+ * تُعرض السور في القوائم بهذا الترتيب ليطابق اتجاه الورد، لا ترتيب المصحف.
+ */
+export const SURAHS_BY_PATH: { number: number; name: string }[] = SURAHS
+  .map((name, number) => ({ name, number }))
+  .filter(item => item.number >= 1)
+  .reverse();
+
+/** موضع السورة في رحلة الحفظ: الفاتحة آخرًا (١١٤)، والناس أولًا (١). */
+export function surahPathIndex(surah: number): number {
+  return TOTAL_SURAHS + 1 - surah;
 }
 
 export function hizbLabel(hizb: number): string {

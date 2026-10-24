@@ -21,6 +21,10 @@ export function Onboarding({ onComplete }: { onComplete: (memorizedHizbs: number
     <div className="onboarding" dir="rtl">
       <div className="onboarding-inner">
         <div className="onboarding-brand"><Brand /></div>
+        <div className="onboarding-progress" aria-hidden="true">
+          <span className="ob-dots">{[0, 1, 2].map(index => <i key={index} className={index <= step ? 'on' : ''} />)}</span>
+          <span>الخطوة {ar(step + 1)} من {ar(3)}</span>
+        </div>
 
         {step === 0 && (
           <div className="onboarding-step rise-in">
@@ -51,7 +55,7 @@ export function Onboarding({ onComplete }: { onComplete: (memorizedHizbs: number
         {step === 1 && (
           <div className="onboarding-step rise-in">
             <h2>أين وصلت؟</h2>
-            <p className="onboarding-sub">يمكن تعديل هذا لاحقاً من الإعدادات.</p>
+            <p className="onboarding-sub">نحفظ في ورش من سورة الناس رجوعًا إلى الفاتحة، فالورد يمشي في هذا الاتجاه. يمكن تعديل هذا لاحقاً من الإعدادات.</p>
             <div className="ob-card">
               <div className="ob-card-label">الأحزاب المكتملة من الحزب ٦٠</div>
               <div className="ob-stepper">

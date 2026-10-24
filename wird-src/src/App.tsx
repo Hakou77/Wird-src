@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import {
   ArrowLeft, Bell, Bookmark, BookOpen, CalendarDays, ChartNoAxesCombined, Check,
-  CheckCheck, ChevronLeft, ChevronRight, CircleCheck, Clock3, Flower2, Heart,
+  CheckCheck, ChevronLeft, ChevronRight, CircleCheck, CircleHelp, Clock3, Flower2, Heart,
   Layers3, Leaf, Link2, LockKeyhole, Mic, Moon, Pause, Play, Plus, RefreshCw, RotateCcw,
   Route, Settings2, ShieldCheck, Sparkles, Sprout, Sun, Trash2, X,
   type LucideIcon,
@@ -15,14 +15,15 @@ import {
   type DayRecord, type Difficulty, type Mistake, type MistakeKind, type NearMark, type Page,
   type Settings, type TaskId, type TrackerState,
 } from './lib/tracker';
-import { HIZBS, fromThumnId, pathHizbToMushaf, thumnPage } from './data/quran';
+import { HIZBS, pathHizbToMushaf, thumnPosition, thumnRangeLabel } from './data/quran';
 import WarshReader from './components/WarshReader';
-import { NextStepCard } from './components/NextStep';
+import { TodayHero } from './components/NextStep';
+import { Guide } from './components/Guide';
 import { REMINDER_ANCHORS } from './lib/tracker';
 import { useSessionTimer, useTimerSeconds, type SessionTimer } from './lib/sessionTimer';
 import { markBackupDone, saveItem, shareOrDownload, shouldNudgeBackup } from './lib/storage';
 import { SessionRecorder } from './components/SessionRecorder';
-import { Brand, GeometricPattern, LeafDrawing, Modal, ProgressRing } from './components/Shared';
+import { Brand, LeafDrawing, Modal } from './components/Shared';
 import { HistoryPage, MistakeForm, MistakesPage, PlanPage, SettingsForm } from './components/Pages';
 import { Onboarding } from './components/Onboarding';
 import {
@@ -85,6 +86,7 @@ export default function App() {
   const [mistakeOpen, setMistakeOpen] = useState(false);
   const [editingMistake, setEditingMistake] = useState<Mistake | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [storageError, setStorageError] = useState(false);
@@ -96,7 +98,6 @@ export default function App() {
   const plan = useMemo(() => calculatePlan(state, selectedDate), [state, selectedDate]);
   const record = state.records[selectedDate] || emptyRecord(plan);
   const completed = plan.tasks.filter(task => record.completed.includes(task)).length;
-  const percent = plan.tasks.length ? Math.round((completed / plan.tasks.length) * 100) : 0;
   const currentDay = selectedDate === today;
   const missedReview = hasMissedReview(state, selectedDate);
   const hasYesterdayTask = plan.tasks.includes('yesterday');
@@ -113,7 +114,7 @@ export default function App() {
   const required = requiredReads(state, selectedDate, record.difficulty);
   const isFirstAppDay = state.settings.startedAt === selectedDate && !Object.keys(state.records).some(d => d < selectedDate);
   const coachTips = buildCoachTips(state, today, due.length);
-  const sessionVisible = !!session && !mistakeOpen && !settingsOpen && !confirmation;
+  const sessionVisible = !!session && !mistakeOpen && !settingsOpen && !helpOpen && !confirmation;
 
   const { hint: readHint, setHint: setReadHint, tryRead } = useReadGate(record.lastReadAt);
 
@@ -238,45 +239,37 @@ export default function App() {
     setState(previous => setTaskNote(previous, selectedDate, session, text));
   }
 
-  function startNext() {
-    if (selectedDate > today) { openDate(today); return; }
-    if (percent === 100) { navigate('history'); return; }
-    const order: TaskId[] = plan.isRest ? plan.tasks : farNeedsRedo || missedReview || record.checks['new:first']
-      ? ['yesterday', 'far', 'near', 'new'] : ['yesterday', 'new', 'far', 'near'];
-    const next = order.find(task => plan.tasks.includes(task) && !record.completed.includes(task));
-    if (next) openSession(next);
-  }
-
   const sessionMistakes = state.mistakes.filter(mistake => !mistake.resolved && (
     (mistake.dueAt <= selectedDate && mistake.reviewedAt !== selectedDate) || record.checks[`far:mistake:${mistake.id}`]
   ));
   const sessionSteps = session ? getTaskSteps(session, plan, sessionMistakes) : [];
   const sessionDone = !!session && record.completed.includes(session);
-  const mushafSurah = (() => {
-    // المواضع التي يُفترض فيها عرض المصحف هي نوافذ الجلسات.
-    // لا نملك حدود الأثمان بدقة سورة/آية، فنبدأ من سورة بداية الحزب
-    // ثم يتنقل الحافظ يدويًا داخل العارض.
+  /**
+   * أين يقع ورد هذه الجلسة بالضبط (سورة + آية).
+   * كل الأثمان تُحسب من حدود الأحزاب وعدد الآيات، فلا يعود العارض يفتح على بداية الحزب
+   * بينما يقول العنوان «الثمن الثاني».
+   */
+  const mushafTarget = (() => {
     try {
-      if (!session) return HIZBS[currentHizb - 1]?.surah ?? 1;
-      if (session === 'new') {
-        const unit = Math.min(480, Math.max(1, plan.units + 1));
-        return HIZBS[fromThumnId(unit).hizb - 1]?.surah ?? 1;
-      }
-      if (session === 'yesterday') {
-        const unit = Math.min(480, Math.max(1, plan.units));
-        return HIZBS[fromThumnId(unit).hizb - 1]?.surah ?? 1;
-      }
-      if (session === 'near' && plan.nearThumns.length) {
-        return HIZBS[fromThumnId(plan.nearThumns[0]).hizb - 1]?.surah ?? 1;
-      }
+      if (!session) return undefined;
+      if (session === 'new') return thumnPosition(plan.units + 1);
+      if (session === 'yesterday') return thumnPosition(plan.units);
+      if (session === 'near' && plan.nearThumns.length) return thumnPosition(plan.nearThumns[0]);
       if (session === 'far' && plan.farHizbs.length) {
-        return HIZBS[plan.farHizbs[0] - 1]?.surah ?? 1;
+        const hizb = HIZBS[plan.farHizbs[0] - 1];
+        return hizb
+          ? { hizb: plan.farHizbs[0], thumn: 0, startSurah: hizb.surah, startAyah: hizb.ayah, endSurah: hizb.surah, endAyah: hizb.ayah }
+          : undefined;
       }
-      return HIZBS[currentHizb - 1]?.surah ?? 1;
+      return undefined;
     } catch {
-      return 1;
+      return undefined;
     }
   })();
+  const mushafFocus = mushafTarget
+    ? { surah: mushafTarget.startSurah, ayah: mushafTarget.startAyah, endSurah: mushafTarget.endSurah, endAyah: mushafTarget.endAyah }
+    : undefined;
+  const mushafSurah = mushafTarget?.startSurah ?? HIZBS[currentHizb - 1]?.surah ?? 1;
   const mushafTitle =
     session === 'new' ? 'نص الثمن الجديد من المصحف (ورش)'
     : session === 'yesterday' ? 'نص ثمن الأمس من المصحف (ورش)'
@@ -291,6 +284,28 @@ export default function App() {
     if (session === 'yesterday') return stepsChecked && record.yesterdayErrors !== null && record.yesterdayErrors < 2;
     if (session === 'new') return stepsChecked && record.reads >= required;
     return stepsChecked;
+  })();
+
+  /** Why the finish button is still disabled — a disabled primary action should never be a mystery. */
+  const finishHint = (() => {
+    if (!session || allStepsChecked) return null;
+    if (selectedDate > today) return 'هذا يوم قادم — يمكنك المعاينة، ويُسجَّل الإنجاز في يومه.';
+    if (session === 'near') {
+      const marked = plan.nearThumns.filter(id => record.nearMarks[id]).length;
+      return `بقي ${ar(Math.max(0, plan.nearThumns.length - marked))} من ${ar(plan.nearThumns.length)} ثمنًا حتى تُتمّ المراجعة.`;
+    }
+    if (session === 'yesterday') {
+      if (record.yesterdayErrors === null) return 'اختر عدد أخطاء التسميع أعلاه أولًا.';
+      if (record.yesterdayErrors >= 2) return 'أعد التسميع حتى لا يتجاوز الخطأ واحدًا.';
+    }
+    if (session === 'new' && record.reads < required) {
+      return `أكمل ${ar(required)} قراءات مركّزة أولًا — سجّلت ${ar(record.reads)}.`;
+    }
+    const pending = sessionSteps.filter(step => !record.checks[step.id]).length;
+    if (pending === 1) return 'بقيت خطوة واحدة لإتمام هذه الجلسة.';
+    if (pending === 2) return 'بقيت خطوتان لإتمام هذه الجلسة.';
+    if (pending > 2) return `بقيت ${ar(pending)} خطوات لإتمام هذه الجلسة.`;
+    return null;
   })();
 
   function finishSession() {
@@ -486,15 +501,16 @@ export default function App() {
     setConfirmation(null);
   }
 
+  /** One exact locator straight from the thumn table: hizb · thumn · the ayahs it spans. */
+  function unitWhere(unit: number) {
+    const { hizb, thumn } = thumnPosition(unit);
+    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · ${thumnRangeLabel(unit)}`;
+  }
+
   function taskDescription(task: TaskId): string {
     switch (task) {
-      case 'yesterday': return unitLabel(plan.units);
-      case 'new': {
-        const unit = plan.units + 1;
-        const { hizb, thumn } = fromThumnId(Math.min(480, unit));
-        const where = `${unitLabel(unit)} · ص ${ar(thumnPage(unit))} · الحزب ${ar(hizb)} ثمن ${ar(thumn)}`;
-        return plan.newHalf ? `الحد الأدنى: نصف صفحة من ${where}` : where;
-      }
+      case 'yesterday': return unitWhere(plan.units);
+      case 'new': return plan.newHalf ? `الحد الأدنى: نصف صفحة — ${unitWhere(plan.units + 1)}` : unitWhere(plan.units + 1);
       case 'near': return `${nearLabel(plan)} · ${ar(plan.nearThumns.length)} أثمان`;
       case 'far': {
         const span = farSpanLabel(plan);
@@ -509,12 +525,44 @@ export default function App() {
     const Icon = TASK_ICONS[task];
     const done = record.completed.includes(task);
     const checkedSteps = Object.keys(record.checks).filter(key => key.startsWith(`${task}:`) && record.checks[key]).length;
-    return <motion.article layout key={task} className={`task-card task-${task} ${done ? 'task-done' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: task === 'near' ? 0.05 : task === 'far' ? 0.1 : 0 }}>
-      <div className="task-top"><span className="task-icon"><Icon size={23} strokeWidth={1.65} /></span><div className="task-copy"><div className="task-title-line"><h3>{TASK_NAMES[task]}</h3><span className="task-time">{TASK_TIMES[task]}</span></div><p>{taskDescription(task)}</p></div><button className={`task-check ${done ? 'checked' : ''}`} onClick={() => openSession(task)} aria-label={done ? `عرض ${TASK_NAMES[task]} المكتمل` : `بدء ${TASK_NAMES[task]}`}>{done ? <Check size={16} strokeWidth={2.5} /> : <span />}</button></div>
+    const totalSteps = getTaskSteps(task, plan, sessionMistakes).length;
+    const nearMarked = task === 'near' ? plan.nearThumns.filter(id => record.nearMarks[id]).length : 0;
+    const inProgress = !done && (checkedSteps > 0 || nearMarked > 0 || (task === 'yesterday' && record.yesterdayErrors !== null));
+    const progressRatio = task === 'near'
+      ? (plan.nearThumns.length ? nearMarked / plan.nearThumns.length : 0)
+      : (totalSteps ? checkedSteps / totalSteps : 0);
+    // One short, honest line under the title: how far in this step you already are.
+    const meta = done
+      ? 'تمّ بحمد الله'
+      : inProgress
+        ? task === 'near'
+          ? `${ar(nearMarked)} من ${ar(plan.nearThumns.length)} ثمن`
+          : task === 'yesterday'
+            ? 'سُجّل التسميع، أكمل الخطوات'
+            : `${ar(checkedSteps)} من ${ar(totalSteps)} خطوات`
+        : task === 'far' && !plan.isRest
+          ? `اليوم ${ar(plan.cycleDay)} من دورة ${ar(plan.cycleLength)} أيام`
+          : TASK_DURATIONS[task];
+    const actionLabel = done && !farNeedsRedo
+      ? 'عرض الإنجاز'
+      : inProgress
+        ? 'أكمل من حيث وصلت'
+        : task === 'new' && !newUnlocked
+        ? 'يُفتح بعد مراجعتك'
+        : task === 'new'
+          ? 'ابدأ الحفظ'
+          : task === 'links' || task === 'recite'
+            ? 'ابدأ الخطوة'
+            : task === 'far' && farNeedsRedo
+              ? 'أعد التسميع'
+              : 'ابدأ المراجعة';
+    return <motion.article layout key={task} className={`task-card task-${task} ${done ? 'task-done' : ''} ${inProgress ? 'task-started' : ''}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: task === 'near' ? 0.05 : task === 'far' ? 0.1 : 0 }}>
+      <div className="task-top"><span className="task-icon"><Icon size={23} strokeWidth={1.65} /></span><div className="task-copy"><div className="task-title-line"><h3>{TASK_NAMES[task]}</h3><span className="task-time">{TASK_TIMES[task]}</span></div><p>{taskDescription(task)}</p></div><span className={`task-status ${done ? 'checked' : inProgress ? 'started' : ''}`} aria-hidden="true">{done ? <Check size={16} strokeWidth={2.5} /> : inProgress ? <span /> : null}</span></div>
+      {inProgress && <div className="task-progress" aria-hidden="true"><i style={{ width: `${Math.round(progressRatio * 100)}%` }} /></div>}
       {task === 'new' && hasYesterdayTask && <button className={`prerequisite ${yesterdayDone ? 'prerequisite-done' : ''}`} onClick={() => openSession('yesterday')}><span>{yesterdayDone ? <CircleCheck size={15} /> : <Sun size={15} />} {yesterdayDone ? 'ثمن الأمس حاضر، على بركة الله' : 'قبل الجديد، سمّع ثمن الأمس'}</span>{yesterdayDone ? <Check size={14} /> : <ArrowLeft size={15} />}</button>}
       {task === 'far' && farNeedsRedo && done && <div className="notice notice-warm"><Heart size={17} /><p>أكثر من خطأين. أعد البعيدة قبل الحفظ الجديد.</p></div>}
       {task === 'far' && <CycleBar plan={plan} />}
-      <div className="task-bottom"><span className="task-duration">{done ? <CheckCheck size={14} /> : <Clock3 size={14} />} {done ? 'تمّ بحمد الله' : task === 'far' && !plan.isRest ? `اليوم ${ar(plan.cycleDay)} من دورة ${ar(plan.cycleLength)} أيام` : TASK_DURATIONS[task]}</span><button className="text-button task-action" onClick={() => openSession(task)}>{done && !farNeedsRedo ? 'عرض الإنجاز' : checkedSteps ? 'أكمل من حيث وصلت' : task === 'new' ? 'ابدأ الحفظ' : task === 'links' || task === 'recite' ? 'ابدأ الخطوة' : task === 'far' && farNeedsRedo ? 'أعد التسميع' : 'ابدأ المراجعة'}{task === 'new' && !newUnlocked && !done ? <LockKeyhole size={14} /> : <ArrowLeft size={15} />}</button></div>
+      <div className="task-bottom"><span className="task-duration">{done ? <CheckCheck size={14} /> : inProgress ? <ChartNoAxesCombined size={14} /> : <Clock3 size={14} />} {meta}</span><button className="task-action" onClick={() => openSession(task)} aria-label={`${actionLabel} — ${TASK_NAMES[task]}`}>{actionLabel}{task === 'new' && !newUnlocked && !done ? <LockKeyhole size={14} /> : <ArrowLeft size={15} />}</button></div>
     </motion.article>;
   }
 
@@ -528,7 +576,7 @@ export default function App() {
           nodes.push(<motion.article layout key="night" className="task-card task-night" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <div className="task-top"><span className="task-icon"><Moon size={23} strokeWidth={1.65} /></span><div className="task-copy"><div className="task-title-line"><h3>تسميع أخير للثمن</h3><span className="task-time">قبل النوم</span></div><p>{unitLabel(plan.units + 1)}</p></div></div>
             <div className="notice"><Sparkles size={17} /><p>سمّعه الآن من الذاكرة — التسميع قبل النوم يثبّت بالنوم.</p></div>
-            <div className="task-bottom"><span className="task-duration"><Clock3 size={14} /> نحو ٥ دقائق</span><button className="text-button task-action" onClick={() => openSession('new')}>أكمل التسميع <ArrowLeft size={15} /></button></div>
+            <div className="task-bottom"><span className="task-duration"><Clock3 size={14} /> نحو ٥ دقائق</span><button className="task-action" onClick={() => openSession('new')}>أكمل التسميع <ArrowLeft size={15} /></button></div>
           </motion.article>);
         }
         continue;
@@ -552,28 +600,40 @@ export default function App() {
   }
 
   return <MotionConfig reducedMotion="user"><div className="app-shell" dir="rtl">
+    <a className="skip-link" href="#main-content">تجاوز إلى المحتوى</a>
     <aside className="sidebar" aria-label="التنقل الرئيسي">
       <button className="brand-button" onClick={() => openDate(today)}><Brand /></button>
       <div className="sidebar-nav-label">مساحتك مع القرآن</div>
       <nav className="desktop-nav">{NAVIGATION.map(item => <button key={item.id} onClick={() => { if (item.id === 'today') openDate(today); else navigate(item.id); }} className={`nav-item ${page === item.id ? 'active' : ''}`} aria-current={page === item.id ? 'page' : undefined}><item.icon size={21} strokeWidth={1.6} /><span>{item.label}</span>{item.id === 'mistakes' && due.length > 0 && <span className="nav-count">{ar(due.length)}</span>}{page === item.id && <span className="active-nav-dot" />}</button>)}</nav>
       <div className="sidebar-verse"><LeafDrawing /><p>وَلَقَدْ يَسَّرْنَا الْقُرْآنَ<br />لِلذِّكْرِ فَهَلْ مِن مُّدَّكِرٍ</p><span>سورة القمر، الآية ١٧</span></div>
-      <div className="sidebar-footer"><button className="nav-item" onClick={() => setSettingsOpen(true)}><Settings2 size={20} strokeWidth={1.6} /><span>الإعدادات</span></button><div className={`storage-status ${storageError ? 'storage-error' : ''}`}><span />{storageError ? 'تعذّر الحفظ على المتصفح' : 'محفوظ على جهازك، لك وحدك'}<ShieldCheck size={13} /></div></div>
+      <div className="sidebar-footer"><button className="nav-item" onClick={() => setHelpOpen(true)}><CircleHelp size={20} strokeWidth={1.6} /><span>كيف يعمل وِرد؟</span></button><button className="nav-item" onClick={() => setSettingsOpen(true)}><Settings2 size={20} strokeWidth={1.6} /><span>الإعدادات</span></button><div className={`storage-status ${storageError ? 'storage-error' : ''}`}><span />{storageError ? 'تعذّر الحفظ على المتصفح' : 'محفوظ على جهازك، لك وحدك'}<ShieldCheck size={13} /></div></div>
     </aside>
 
-    <div className="mobile-topbar"><button className="brand-button" onClick={() => openDate(today)}><Brand small /></button><div className="mobile-top-actions"><button className="icon-button" aria-label="تبديل المظهر" onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button><button className="icon-button" aria-label="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings2 size={20} /></button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" aria-expanded={notificationsOpen}><Bell size={20} />{due.length > 0 && <i />}</button></div></div>
+    <div className="mobile-topbar"><button className="brand-button" onClick={() => openDate(today)}><Brand small /></button><div className="mobile-top-actions"><button className="icon-button" aria-label="تبديل المظهر" title={state.settings.theme === 'light' ? 'المظهر الداكن' : 'المظهر الفاتح'} onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}</button><button className="icon-button" aria-label="الإعدادات" title="الإعدادات" onClick={() => setSettingsOpen(true)}><Settings2 size={20} /></button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" title="رسائل وتذكير" aria-expanded={notificationsOpen}><Bell size={20} />{due.length > 0 && <i />}</button></div></div>
 
     <main className="main-content" id="main-content">
-      <div className={`desktop-utility ${page === 'today' ? 'utility-today' : ''}`}><div className="date-display"><CalendarDays size={19} strokeWidth={1.5} /><div><strong>{formatDate(selectedDate)}</strong><span>{hijriDate(selectedDate)}</span></div></div><button className="icon-button" aria-label="تبديل المظهر" onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" aria-expanded={notificationsOpen}><Bell size={20} strokeWidth={1.5} />{due.length > 0 && <i />}</button></div>
+      <div className={`desktop-utility ${page === 'today' ? 'utility-today' : ''}`}><div className="date-display"><CalendarDays size={19} strokeWidth={1.5} /><div><strong>{formatDate(selectedDate)}</strong><span>{hijriDate(selectedDate)}</span></div></div><button className="icon-button" aria-label="تبديل المظهر" title={state.settings.theme === 'light' ? 'المظهر الداكن' : 'المظهر الفاتح'} onClick={() => setState(p => ({ ...p, settings: { ...p.settings, theme: p.settings.theme === 'light' ? 'dark' : 'light' } }))}>{state.settings.theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button notification-button" onClick={() => setNotificationsOpen(value => !value)} aria-label="الإشعارات" title="رسائل وتذكير" aria-expanded={notificationsOpen}><Bell size={20} strokeWidth={1.5} />{due.length > 0 && <i />}</button></div>
       <AnimatePresence mode="wait">
         <motion.div key={page} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.22 }}>
           {page === 'today' && <div className="today-page">
             <header className="today-heading">
               <span className="eyebrow greeting"><Sun size={16} strokeWidth={1.5} /><span className="greeting-text">{state.settings.name ? `السلام عليك، يا ${state.settings.name}` : 'السلام عليك، يا رفيق القرآن'}</span><span className="greeting-date">{formatDate(selectedDate)}</span></span>
               <h1>كل يوم، أقرب إلى الإتقان.</h1>
-              <p>رحلة الألف آية تبدأ بورد، وتزهر بالمداومة. {currentDay && plan.estimatedPages > 0 && <span className="day-estimate">نحو {ar(plan.estimatedPages)} صفحة</span>}</p>
+              <p>رحلة الألف آية تبدأ بورد، وتزهر بالمداومة.</p>
             </header>
-            {currentDay && <NextStepCard tasks={plan.tasks} completed={record.completed} description={taskDescription} half={!!plan.newHalf} onStart={openSession} onHalf={setHalfMemorization} />}
-            <section className="daily-banner" aria-label="ملخص ورد اليوم"><GeometricPattern /><div className="banner-copy"><span className="banner-eyebrow"><Sparkles size={15} /> {percent === 100 ? 'بارك الله في سعيك' : plan.isRest ? 'مساحة للرسوخ والتثبيت' : 'على بركة الله'}</span><h2>{percent === 100 ? 'اكتمل وردك، وبقي أثره.' : plan.isRest ? 'اليوم نُثبّت ما زرعناه.' : 'وردٌ صغير، وأثرٌ كبير.'}</h2><p>{percent === 100 ? 'أعطيت القرآن من وقتك، فطوبى لقلبك بهذا الأنس.' : plan.isRest ? 'لا حفظ جديد اليوم. نعطي محفوظك حقّه من العناية.' : 'حفظٌ جديد، ومراجعة تُبقي الآيات قريبة من قلبك.'}</p><button className="button banner-button" onClick={startNext}>{!currentDay ? 'العودة إلى ورد اليوم' : percent === 100 ? 'شاهد أثر رحلتك' : completed > 0 ? 'نكمل على بركة الله' : 'بسم الله، نبدأ'}<ArrowLeft size={17} /></button></div><ProgressRing value={percent} complete={completed} total={plan.tasks.length} /></section>
+            <TodayHero
+              tasks={plan.tasks}
+              completed={record.completed}
+              description={taskDescription}
+              half={!!plan.newHalf}
+              isToday={currentDay}
+              isRest={plan.isRest}
+              estimatedPages={plan.estimatedPages}
+              onStart={openSession}
+              onHalf={setHalfMemorization}
+              onBackToToday={() => openDate(today)}
+              onSeeProgress={() => navigate('history')}
+            />
 
             <section className="week-strip" aria-label="أيام الأسبوع"><div className="week-label"><span>{shownWeek === weekStart(today) ? 'هذا الأسبوع' : formatDate(shownWeek, true)}</span><div><button className="week-arrow" aria-label="الأسبوع السابق" onClick={() => setShownWeek(value => addDays(value, -7))}><ChevronRight size={16} /></button><button className="week-arrow" aria-label="الأسبوع التالي" disabled={shownWeek > weekStart(today)} onClick={() => setShownWeek(value => addDays(value, 7))}><ChevronLeft size={16} /></button></div></div><div className="week-days">{Array.from({ length: 7 }, (_, i) => {
               const date = addDays(shownWeek, i);
@@ -617,10 +677,10 @@ export default function App() {
 
     <nav className="mobile-nav" aria-label="التنقل الرئيسي">{NAVIGATION.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => item.id === 'today' ? openDate(today) : navigate(item.id)}><item.icon size={21} strokeWidth={page === item.id ? 1.9 : 1.6} /><span>{item.mobileLabel}</span>{page === item.id && <motion.i layoutId="mobile-nav-indicator" />}</button>)}</nav>
 
-    <AnimatePresence>{notificationsOpen && <><motion.div className="popover-dismiss" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotificationsOpen(false)} /><motion.div className="notifications-popover" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><div className="section-heading"><h2>رسائل لطيفة</h2><button className="icon-button tiny-icon-button" aria-label="إغلاق الإشعارات" onClick={() => setNotificationsOpen(false)}><X size={17} /></button></div><button className="notification-item" onClick={() => openDate(today)}><Sun size={22} /><div><strong>{isDayComplete(state.records[today]) ? 'وردك اكتمل، تقبّل الله منك' : 'موعدك مع الآيات ينتظرك'}</strong><p>{isDayComplete(state.records[today]) ? 'نسأل الله أن يجعل القرآن نورًا لقلبك.' : 'لا تحتاج وقتًا مثاليًا، فقط خطوة تبدأ بها.'}</p></div></button>{due.length > 0 && <button className="notification-item" onClick={() => navigate('mistakes')}><Bookmark size={21} /><div><strong>{ar(due.length)} مواضع تحتاج عناية</strong><p>مراجعة إضافية قصيرة، لحفظ أكثر رسوخًا.</p></div></button>}<div className="notification-reminder"><span>{state.settings.reminderEnabled ? `التذكير اليومي: ${state.settings.reminderTime}` : 'تذكير هادئ، في وقت تختاره'}</span><button className="text-button" onClick={() => { setNotificationsOpen(false); setSettingsOpen(true); }}>{state.settings.reminderEnabled ? 'تعديل' : 'تفعيل'} <ArrowLeft size={13} /></button></div></motion.div></>}</AnimatePresence>
+    <AnimatePresence>{notificationsOpen && <><motion.div className="popover-dismiss" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setNotificationsOpen(false)} /><motion.div className="notifications-popover" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><div className="section-heading"><h2>رسائل لطيفة</h2><button className="icon-button tiny-icon-button" aria-label="إغلاق الإشعارات" onClick={() => setNotificationsOpen(false)}><X size={17} /></button></div><button className="notification-item" onClick={() => openDate(today)}><Sun size={22} /><div><strong>{isDayComplete(state.records[today]) ? 'وردك اكتمل، تقبّل الله منك' : 'موعدك مع الآيات ينتظرك'}</strong><p>{isDayComplete(state.records[today]) ? 'نسأل الله أن يجعل القرآن نورًا لقلبك.' : 'لا تحتاج وقتًا مثاليًا، فقط خطوة تبدأ بها.'}</p></div></button>{due.length > 0 && <button className="notification-item" onClick={() => navigate('mistakes')}><Bookmark size={21} /><div><strong>{ar(due.length)} مواضع تحتاج عناية</strong><p>مراجعة إضافية قصيرة، لحفظ أكثر رسوخًا.</p></div></button>}<div className="notification-reminder"><span>{state.settings.reminderEnabled ? `التذكير اليومي: ${state.settings.reminderTime}` : 'تذكير هادئ، في وقت تختاره'}</span><button className="text-button" onClick={() => { setNotificationsOpen(false); setSettingsOpen(true); }}>{state.settings.reminderEnabled ? 'تعديل' : 'تفعيل'} <ArrowLeft size={13} /></button></div><button className="notification-guide" onClick={() => { setNotificationsOpen(false); setHelpOpen(true); }}><CircleHelp size={17} /><span>كيف يعمل وِرد؟ دليل قصير</span><ArrowLeft size={14} /></button></motion.div></>}</AnimatePresence>
 
     <AnimatePresence mode="wait">
-      {session && !mistakeOpen && <Modal key={`session-${session}`} title={TASK_NAMES[session]} subtitle={taskDescription(session)} icon={<SessionIcon size={23} />} onClose={closeSession} className="session-modal">
+      {session && !mistakeOpen && !helpOpen && <Modal key={`session-${session}`} title={TASK_NAMES[session]} subtitle={taskDescription(session)} icon={<SessionIcon size={23} />} onClose={closeSession} className="session-modal">
         {sessionDone ? <div className="completed-session"><div className="completed-seal"><CheckCheck size={37} strokeWidth={1.4} /></div><h3>تمّ بحمد الله</h3><p>خطوة أتممتها، وأثر بقي في قلبك.</p><button className="button button-primary" onClick={closeSession}>العودة إلى وردي <ArrowLeft size={17} /></button><button className="text-button muted-button" onClick={reopenTask}><RotateCcw size={14} /> تراجُع عن إتمام هذه الخطوة</button></div> : <>
           <div className="session-timer"><div><span><Leaf size={15} /> مساحة للتفرّغ</span><small>اترك العجلة خارج هذه اللحظة.</small></div><div className="timer-controls"><strong dir="ltr" aria-live="off"><TimerText timer={timer} /></strong><button className={`icon-button timer-play ${timer.running ? 'running' : ''}`} onClick={timer.toggle} aria-label={timer.running ? 'إيقاف المؤقت مؤقتًا' : 'تشغيل مؤقت التفرغ'}>{timer.running ? <Pause size={16} /> : <Play size={16} />}</button><button className="icon-button" aria-label="إعادة ضبط المؤقت" onClick={timer.reset}><RotateCcw size={16} /></button></div></div>
           <SessionRecorder date={selectedDate} task={session} />
@@ -648,6 +708,7 @@ export default function App() {
             <WarshReader
               key={`mushaf-${session}-${plan.date}-${mushafSurah}`}
               defaultSurah={mushafSurah}
+              focus={mushafFocus}
               title={mushafTitle}
               defaultOpen={session === 'new'}
             />
@@ -655,11 +716,12 @@ export default function App() {
           {session && <TaskNote task={session} value={record.taskNotes[session] || ''} onChange={updateTaskNote} />}
           {session === 'far' && record.errors >= 2 && <div className="notice notice-warm"><Heart size={17} /><p>أكثر من خطأين — قصّر الدورة أو أبطئ الحفظ الجديد، وأعد البعيدة قبل فتح ثمن جديد.</p></div>}
           <button className="add-mistake-link" onClick={() => addMistake()}><Bookmark size={16} /><span>تعثّرت في موضع؟ سجّله للتثبيت</span><Plus size={17} /></button>
-          <div className="session-footer"><button className="button button-primary" disabled={!allStepsChecked} onClick={finishSession}><Check size={18} /> {session === 'yesterday' ? 'تمّ التسميع، نكمل' : session === 'new' ? 'أتممت حفظ الثمن وتسميعه' : session === 'near' ? 'أتممت المراجعة القريبة' : 'أتممت هذه الخطوة'}</button><button className="text-button muted-button" onClick={closeSession}>أكمل لاحقًا، احفظ تقدّمي</button></div>
+          <div className="session-footer"><button className="button button-primary" disabled={!allStepsChecked} onClick={finishSession}><Check size={18} /> {session === 'yesterday' ? 'تمّ التسميع، نكمل' : session === 'new' ? 'أتممت حفظ الثمن وتسميعه' : session === 'near' ? 'أتممت المراجعة القريبة' : 'أتممت هذه الخطوة'}</button>{finishHint && <p className="session-hint">{finishHint}</p>}<button className="text-button muted-button" onClick={closeSession}>أكمل لاحقًا، احفظ تقدّمي</button></div>
         </>}
       </Modal>}
       {mistakeOpen && <Modal key="mistake" title={editingMistake ? 'عناية بموضع التثبيت' : 'موضع يحتاج قليلًا من العناية'} subtitle="سجّله الآن، ليكون أقرب إلى الإتقان غدًا." icon={<Bookmark size={22} />} onClose={() => setMistakeOpen(false)}><MistakeForm existing={editingMistake} defaultHizb={currentHizb} onSave={saveMistake} onCancel={() => setMistakeOpen(false)} /></Modal>}
       {celebrateHizb !== null && <Modal key="celebrate" title={celebrateHizb <= 1 ? 'مبارك! ختمت محفوظك' : `مبارك! أتممت الحزب ${ar(celebrateHizb)}`} subtitle={celebrateHizb <= 1 ? 'اللهم اجعله حجة لك لا عليك.' : 'تنتقل الطبقات تلقائيًا ابتداءً من الغد.'} icon={<Sparkles size={22} />} onClose={() => setCelebrateHizb(null)} className="confirm-modal"><p className="confirmation-text">{celebrateHizb <= 1 ? 'وصلت إلى الفاتحة. الحمد لله — ثباتك هو الفوز.' : `حفظك ينمو. الحمد لله — انتقلت إلى الحزب ${ar(celebrateHizb - 1)} بإذن الله. أكمل بهدوء، فالثبات أهم من العجلة.`}</p><div className="modal-footer"><button className="button button-primary" onClick={() => setCelebrateHizb(null)}>الحمد لله، متابعة</button></div></Modal>}
+      {helpOpen && <Modal key="guide" title="كيف يعمل وِرد؟" subtitle="ترتيب يومك، وثلاث طبقات، ومعيار واحد." icon={<CircleHelp size={22} />} onClose={() => setHelpOpen(false)} className="guide-modal"><Guide /></Modal>}
       {settingsOpen && <Modal key="settings" title="على قدر خطاك" subtitle="خطة مرنة، وإعدادات تشبه يومك." icon={<Settings2 size={22} />} onClose={() => setSettingsOpen(false)} className="settings-modal"><SettingsForm state={state} onSave={saveSettings} onExport={exportData} onImport={importData} onReset={() => { setSettingsOpen(false); setConfirmation({ type: 'reset' }); }} /></Modal>}
       {confirmation && <Modal key="confirmation" title={confirmation.type === 'delete' ? 'هل تحذف هذا الموضع؟' : confirmation.type === 'reset' ? 'صفحة جديدة في رحلتك؟' : 'هل تستعيد هذه النسخة؟'} icon={confirmation.type === 'delete' ? <Trash2 size={22} /> : <RefreshCw size={22} />} onClose={() => setConfirmation(null)} className="confirm-modal"><p className="confirmation-text">{confirmation.type === 'delete' ? 'سيُحذف من قائمة التثبيت. لن تتأثر بقية خطتك أو إنجازاتك.' : confirmation.type === 'reset' ? 'سيُحذف سجلّ الإنجاز ومواضع التثبيت من هذا الجهاز. صدّر نسخة أولًا إن أردت الاحتفاظ بها.' : 'ستُستبدل بيانات هذا المتصفح بالخطة والسجلّ الموجودين في النسخة. يمكنك إلغاء العملية لتصدير بياناتك الحالية أولًا.'}</p><div className="modal-footer"><button className={`button ${confirmation.type === 'import' ? 'button-primary' : 'button-danger'}`} onClick={confirmAction}>{confirmation.type === 'delete' ? 'نعم، احذف الموضع' : confirmation.type === 'reset' ? 'ابدأ رحلة جديدة' : 'استعادة النسخة'}</button><button className="button button-ghost" onClick={() => setConfirmation(null)}>إلغاء</button></div></Modal>}
     </AnimatePresence>

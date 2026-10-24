@@ -10,9 +10,11 @@ import {
   isDayComplete, normalizeArabic, ordinal, rhythmLast7, totalUnits, MISTAKE_KINDS, WEEKDAYS,
   type Mistake, type MistakeKind, type Settings, type ThemeName, type TrackerState,
 } from '../lib/tracker';
-import { RULES, SURAHS, hizbLabel } from '../data/quran';
+import { RULES, SURAHS_BY_PATH, hizbLabel, toAr } from '../data/quran';
 import { EmptyState } from './Shared';
 import { PathMap, ReadingStats } from './SessionExtras';
+import { DAILY_ORDER } from './Guide';
+import { BUILD } from '../lib/version';
 
 export function PlanPage({ state, today, onEdit, onFarChange }: {
   state: TrackerState; today: string; onEdit: () => void; onFarChange: (amount: 0.5 | 1 | 2) => void;
@@ -30,7 +32,16 @@ export function PlanPage({ state, today, onEdit, onFarChange }: {
         <div className="plan-eighths"><div className="between"><span>الحزب {units >= 480 ? ordinal(1) : ordinal(60 - hizbs)}</span><span>{ar(eighths)} / ٨ أثمان</span></div><div className="eighths-track">{Array.from({ length: 8 }, (_, i) => <span key={i} className={i < eighths ? 'filled' : ''} />)}</div><small>تُضاف الأثمان تلقائيًا عند إتمام الحفظ الجديد.</small></div>
       </section>
 
-      <div className="section-heading"><h2>أساس يومك</h2><span>ثلاث طبقات متكاملة</span></div>
+      <div className="section-heading"><h2>أساس يومك</h2><span>ترتيب ثابت كل يوم</span></div>
+      <ol className="guide-order plan-order" aria-label="ترتيب وردك اليومي">
+        {DAILY_ORDER.map((step, index) => (
+          <li key={step.label}>
+            <span className="guide-step-num">{ar(index + 1)}</span>
+            <span className="guide-step-text"><strong>{step.label}</strong></span>
+            {index < DAILY_ORDER.length - 1 && <ArrowLeft className="guide-step-arrow" size={14} aria-hidden="true" />}
+          </li>
+        ))}
+      </ol>
       <div className="plan-layers">
         <div className="plan-layer"><span className="layer-number">٠١</span><div className="layer-copy"><span className="section-kicker terracotta-text"><BookOpen size={17} /> الحفظ الجديد</span><h3>ثمن واحد، بإتقان.</h3><p>ابدأ بتسميع ثمن الأمس بلا خطأ. اقرأ الجديد ٣ إلى ٥ مرات، ثم احفظه وسمّعه مرتين في اليوم نفسه.</p></div><span className="layer-amount">نحو صفحة وربع<small>كل يوم عدا {WEEKDAYS[state.settings.restDay]}</small></span></div>
         <div className="plan-layer"><span className="layer-number">٠٢</span><div className="layer-copy"><span className="section-kicker"><Layers3 size={17} /> المراجعة القريبة</span><h3>الجديد يحتاج جذورًا.</h3><p>الحزب {ordinal(plan.previousHizb)} كاملًا، وكل ما حفظته من الحزب {ordinal(plan.currentHizb)}. عند إتمام الحزب، تنتقل الطبقات تلقائيًا في الورد التالي.</p></div><span className="layer-amount">آخر حزبين تقريبًا<small>مراجعة يومية للتثبيت</small></span></div>
@@ -137,7 +148,8 @@ export function MistakeForm({ existing, defaultHizb, onSave, onCancel }: {
   const [kind, setKind] = useState<MistakeKind>(existing?.kind || 'stop');
   const [hizb, setHizb] = useState(existing?.hizb || defaultHizb);
   const [error, setError] = useState('');
-  const surahSuggestions = SURAHS.filter(Boolean);
+  // اقتراحات السور بترتيب الحفظ (من الناس إلى الفاتحة)، لا بترتيب المصحف.
+  const surahSuggestions = SURAHS_BY_PATH.map(item => item.name);
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!surah.trim() || !location.trim()) { setError('اكتب اسم السورة والموضع ليكون الرجوع إليه سهلًا.'); return; }
@@ -184,6 +196,6 @@ export function SettingsForm({ state, onSave, onExport, onImport, onReset }: {
     <div className="form-section-title"><CalendarDays size={18} /><h3>موعد لطيف للعودة</h3></div><div className="reminder-setting"><div><strong>تذكير يومي بالورد</strong><small>التذكير يعمل عندما يكون التطبيق مفتوحًا.</small></div><button type="button" className={`switch ${draft.reminderEnabled ? 'on' : ''}`} role="switch" aria-checked={draft.reminderEnabled} aria-label="تفعيل التذكير اليومي" onClick={() => set('reminderEnabled', !draft.reminderEnabled)}><span /></button></div>{draft.reminderEnabled && <><div className="anchor-chips" role="radiogroup" aria-label="اربط التذكير بروتينك">{REMINDER_ANCHORS.map(anchor => <button key={anchor.id} type="button" role="radio" aria-checked={draft.reminderAnchor === anchor.id} className={`anchor-chip ${draft.reminderAnchor === anchor.id ? 'active' : ''}`} onClick={() => { set('reminderAnchor', anchor.id); if (anchor.time) set('reminderTime', anchor.time); }}>{anchor.label}</button>)}</div><label className="field-label">وقت التذكير<input type="time" required value={draft.reminderTime} onChange={event => set('reminderTime', event.target.value)} /></label><small className="form-help">عدّل الوقت ليناسب موعد صلاتك، فالتطبيق لا يعرف مواقيت الصلاة في موقعك.</small></>}
     <div className="form-section-title"><Sun size={18} /><h3>المظهر</h3></div><div className="segmented-control theme-control" aria-label="مظهر التطبيق">{([{ id: 'light', label: 'فاتح' }, { id: 'dark', label: 'داكن' }] as { id: ThemeName; label: string }[]).map(option => <button key={option.id} type="button" aria-pressed={draft.theme === option.id} className={draft.theme === option.id ? 'selected' : ''} onClick={() => set('theme', option.id)}>{option.label}{draft.theme === option.id && <Check size={15} />}</button>)}</div>
     <div className="modal-footer settings-save"><button className="button button-primary" type="submit"><Check size={18} /> حفظ الإعدادات</button></div>
-    <div className="data-section"><div className="form-section-title"><ShieldCheck size={18} /><h3>بياناتك، لك وحدك</h3></div><p className="form-help">تُحفظ على هذا المتصفح فقط، دون حساب. احتفظ بنسخة قبل تغيير الجهاز أو مسح بيانات المتصفح.</p><div className="backup-actions"><button type="button" className="button button-outline button-small" onClick={onExport}><Download size={15} /> تصدير نسخة</button><button type="button" className="button button-outline button-small" onClick={() => fileRef.current?.click()}><Upload size={15} /> استعادة نسخة</button><button type="button" className="text-button danger-text" onClick={onReset}>بدء رحلة جديدة</button><input type="file" accept="application/json,.json" ref={fileRef} hidden onChange={event => { const file = event.target.files?.[0]; if (file) onImport(file); event.target.value = ''; }} /></div></div>
+    <div className="data-section"><div className="form-section-title"><ShieldCheck size={18} /><h3>بياناتك، لك وحدك</h3></div><p className="form-help">تُحفظ على هذا المتصفح فقط، دون حساب. احتفظ بنسخة قبل تغيير الجهاز أو مسح بيانات المتصفح.</p><div className="backup-actions"><button type="button" className="button button-outline button-small" onClick={onExport}><Download size={15} /> تصدير نسخة</button><button type="button" className="button button-outline button-small" onClick={() => fileRef.current?.click()}><Upload size={15} /> استعادة نسخة</button><button type="button" className="text-button danger-text" onClick={onReset}>بدء رحلة جديدة</button><input type="file" accept="application/json,.json" ref={fileRef} hidden onChange={event => { const file = event.target.files?.[0]; if (file) onImport(file); event.target.value = ''; }} /></div><p className="build-stamp">إصدار التطبيق <span dir="ltr">{BUILD.sha}</span> · {toAr(BUILD.date)} — إن لم يتغيّر بعد التحديث، فأعد تحميل الصفحة لتجاوز النسخة المحفوظة.</p></div>
   </form>;
 }
