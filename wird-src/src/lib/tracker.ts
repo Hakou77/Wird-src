@@ -1,4 +1,4 @@
-import { HIZBS, THUMNS_PER_HIZB, TOTAL_THUMNS, fromThumnId, hizbPageSpan, mushafHizbToPath, pathHizbToMushaf, thumnPage, type Hizb } from '../data/quran';
+import { HIZBS, THUMNS_PER_HIZB, TOTAL_THUMNS, fromThumnId, mushafHizbToPath, pathHizbToMushaf, type Hizb } from '../data/quran';
 
 export type Page = 'today' | 'plan' | 'history' | 'mistakes' | 'map';
 export type TaskId = 'yesterday' | 'new' | 'near' | 'far' | 'links' | 'recite';
@@ -55,11 +55,12 @@ export interface DailyPlan {
   dailyFar: number;
   isRest: boolean;
   tasks: TaskId[];
-  /** Minimum day: half a page of new memorization instead of a full thumn (does not advance progress). */
+  /** Minimum day: about half a thumn of new memorization instead of a full one (does not advance progress). */
   newHalf?: boolean;
   nearThumns: number[];
   weakExtra: number[];
-  estimatedPages: number;
+  /** مقدار ورد اليوم بالأثمان — عدٌّ من جدول الأثمان، لا تقدير بأرقام الصفحات. */
+  estimatedUnits: number;
   cycleWarn: boolean;
 }
 
@@ -345,7 +346,7 @@ function normalizeRecord(raw: unknown): DayRecord | null {
       return map;
     })(),
     taskNotes: isRecordShape(raw.taskNotes) ? (raw.taskNotes as DayRecord['taskNotes']) : {},
-    plan: { ...plan, nearThumns: Array.isArray(plan.nearThumns) ? plan.nearThumns : [], weakExtra: Array.isArray(plan.weakExtra) ? plan.weakExtra : [], estimatedPages: typeof plan.estimatedPages === 'number' ? plan.estimatedPages : 0, cycleWarn: plan.cycleWarn === true },
+    plan: { ...plan, nearThumns: Array.isArray(plan.nearThumns) ? plan.nearThumns : [], weakExtra: Array.isArray(plan.weakExtra) ? plan.weakExtra : [], estimatedUnits: typeof plan.estimatedUnits === 'number' ? plan.estimatedUnits : 0, cycleWarn: plan.cycleWarn === true },
   };
 }
 
@@ -498,16 +499,13 @@ export function readingAnalytics(state: TrackerState): {
   return { avgReads, retention, readDays, pairs, advice };
 }
 
-export function estimatePages(plan: { units: number; isRest: boolean; nearThumns: number[]; farHizbs: number[]; farHalf: 0 | 1 | 2; cycleWarn: boolean }): number {
-  let p = 0;
-  const nextUnit = plan.units + 1;
-  if (!plan.isRest && plan.units < 480 && nextUnit <= 480) p += 1.25;
-  p += plan.nearThumns.length * 1.25;
-  for (const h of plan.farHizbs) {
-    const { pages } = hizbPageSpan(h);
-    p += plan.farHalf ? Math.max(1, Math.round(pages / 2)) : pages;
-  }
-  return Math.round(p);
+export function estimateUnits(plan: { units: number; isRest: boolean; nearThumns: number[]; farHizbs: number[]; farHalf: 0 | 1 | 2 }): number {
+  let units = 0;
+  if (!plan.isRest && plan.units + 1 <= TOTAL_THUMNS) units += 1;
+  units += plan.nearThumns.length;
+  // المراجعة البعيدة تُعدّ بالأثمان لا بالصفحات: نصف الحزب أربعة أثمان، وكامله ثمانية.
+  units += plan.farHizbs.length * (plan.farHalf ? THUMNS_PER_HIZB / 2 : THUMNS_PER_HIZB);
+  return units;
 }
 
 function fragileExtraFor(state: TrackerState, date: string, units: number): number[] {
@@ -572,9 +570,9 @@ export function calculatePlan(state: TrackerState, date: string): DailyPlan {
     date, units, currentHizb, currentEighths, previousHizb, stableHizbs,
     farHizbs, farHalf, cycleDay: Math.min(cycleLength, Math.floor(offset / dailyFar) + 1),
     cycleLength, dailyFar, isRest, tasks,
-    nearThumns, weakExtra, estimatedPages: 0, cycleWarn: false,
+    nearThumns, weakExtra, estimatedUnits: 0, cycleWarn: false,
   };
-  partial.estimatedPages = estimatePages(partial);
+  partial.estimatedUnits = estimateUnits(partial);
   partial.cycleWarn = cycleWarning(cycleLength, completedPath);
   return partial;
 }
@@ -616,7 +614,7 @@ export function nearLabel(plan: DailyPlan) {
 export function isDayComplete(record?: DayRecord) {
   return !!record && record.plan.tasks.every(task => record.completed.includes(task));
 }
-/** A day that memorized a full thumn (half-page days count for the day, but do not advance the thumn counter). */
+/** A day that memorized a full thumn (short "half a thumn" days count for the day, but do not advance the thumn counter). */
 export function memorizedFull(record: DayRecord): boolean {
   return record.completed.includes('new') && !record.plan.newHalf;
 }
@@ -646,6 +644,15 @@ export function hasMissedReview(state: TrackerState, date: string) {
   const record = state.records[previous];
   if (!record) return true;
   return record.plan.tasks.some(task => (task === 'near' || task === 'far') && !record.completed.includes(task));
+}
+
+/**
+ * أثمان النصف في المراجعة البعيدة: تُقسم على أثمان جدول ورش (٤ + ٤)، لا على الصفحات.
+ */
+export function farThumnBounds(farHalf: 0 | 1 | 2): { from: number; to: number } {
+  if (farHalf === 1) return { from: 1, to: THUMNS_PER_HIZB / 2 };
+  if (farHalf === 2) return { from: THUMNS_PER_HIZB / 2 + 1, to: THUMNS_PER_HIZB };
+  return { from: 1, to: THUMNS_PER_HIZB };
 }
 
 export function farThumnIds(plan: DailyPlan): number[] {
@@ -689,10 +696,6 @@ export function allNearMarked(plan: DailyPlan, record: DayRecord): boolean {
 
 export function pathHizbMeta(hizb: number): Hizb {
   return HIZBS[hizb - 1];
-}
-
-export function thumnPageOf(unit: number): number {
-  return thumnPage(unit);
 }
 
 export function thumnErrorsInWindow(state: TrackerState, end: string, days = 60): Record<number, number> {

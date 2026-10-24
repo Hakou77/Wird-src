@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check:thumns": "node scripts/check-thumns.mjs",
+    "pages:warsh": "node scripts/build-warsh-pages.mjs",
     "preview": "vite preview",
     "offline": "vite build && node scripts/make-offline.mjs"
   },
@@ -23,6 +25,7 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
+    "quran-meta": "^7.0.0",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.3.2",

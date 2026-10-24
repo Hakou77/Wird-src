@@ -116,92 +116,101 @@ export const SURAHS = [
   "الناس",
 ];
 
-import { THUMN_ENDS } from './thumns';
+import { SURAH_AYATS, THUMN_ENDS, type ThumnEnd } from './thumns';
+import { HIZB_END_POINTS, THUMN_END_POINTS, THUMN_START_POINTS, WARSH_MUSHAF_PAGES } from './warsh-pages';
 
 export type Hizb = {
   n: number;
   surah: number;
   ayah: number;
-  page: number;
   juz: number;
+  /** صفحة مطالع الحزب في مصحف ورش، وصفحة آخر آية فيه — من جدولٍ مولَّد لا من استيفاء. */
+  page: number;
+  endPage: number;
 };
 
 export const RIWAYAH = 'ورش عن نافع';
-
-export const HIZBS: Hizb[] = [
-  { n: 1, surah: 1, ayah: 1, page: 1, juz: 1 },
-  { n: 2, surah: 2, ayah: 75, page: 11, juz: 1 },
-  { n: 3, surah: 2, ayah: 141, page: 22, juz: 2 },
-  { n: 4, surah: 2, ayah: 201, page: 32, juz: 2 },
-  { n: 5, surah: 2, ayah: 251, page: 42, juz: 3 },
-  { n: 6, surah: 3, ayah: 15, page: 51, juz: 3 },
-  { n: 7, surah: 3, ayah: 91, page: 62, juz: 4 },
-  { n: 8, surah: 3, ayah: 171, page: 72, juz: 4 },
-  { n: 9, surah: 4, ayah: 24, page: 82, juz: 5 },
-  { n: 10, surah: 4, ayah: 86, page: 92, juz: 5 },
-  { n: 11, surah: 4, ayah: 147, page: 102, juz: 6 },
-  { n: 12, surah: 5, ayah: 25, page: 111, juz: 6 },
-  { n: 13, surah: 5, ayah: 84, page: 121, juz: 7 },
-  { n: 14, surah: 6, ayah: 37, page: 132, juz: 7 },
-  { n: 15, surah: 6, ayah: 112, page: 142, juz: 8 },
-  { n: 16, surah: 7, ayah: 1, page: 151, juz: 8 },
-  { n: 17, surah: 7, ayah: 87, page: 162, juz: 9 },
-  { n: 18, surah: 7, ayah: 171, page: 173, juz: 9 },
-  { n: 19, surah: 8, ayah: 41, page: 182, juz: 10 },
-  { n: 20, surah: 9, ayah: 34, page: 192, juz: 10 },
-  { n: 21, surah: 9, ayah: 94, page: 201, juz: 11 },
-  { n: 22, surah: 10, ayah: 26, page: 212, juz: 11 },
-  { n: 23, surah: 11, ayah: 6, page: 222, juz: 12 },
-  { n: 24, surah: 11, ayah: 83, page: 231, juz: 12 },
-  { n: 25, surah: 12, ayah: 53, page: 242, juz: 13 },
-  { n: 26, surah: 13, ayah: 21, page: 252, juz: 13 },
-  { n: 27, surah: 15, ayah: 1, page: 262, juz: 14 },
-  { n: 28, surah: 16, ayah: 51, page: 272, juz: 14 },
-  { n: 29, surah: 17, ayah: 1, page: 282, juz: 15 },
-  { n: 30, surah: 17, ayah: 99, page: 292, juz: 15 },
-  { n: 31, surah: 18, ayah: 74, page: 302, juz: 16 },
-  { n: 32, surah: 20, ayah: 1, page: 312, juz: 16 },
-  { n: 33, surah: 21, ayah: 1, page: 322, juz: 17 },
-  { n: 34, surah: 22, ayah: 1, page: 332, juz: 17 },
-  { n: 35, surah: 23, ayah: 1, page: 342, juz: 18 },
-  { n: 36, surah: 24, ayah: 21, page: 352, juz: 18 },
-  { n: 37, surah: 25, ayah: 21, page: 362, juz: 19 },
-  { n: 38, surah: 26, ayah: 111, page: 371, juz: 19 },
-  { n: 39, surah: 27, ayah: 58, page: 382, juz: 20 },
-  { n: 40, surah: 28, ayah: 51, page: 392, juz: 20 },
-  { n: 41, surah: 29, ayah: 46, page: 402, juz: 21 },
-  { n: 42, surah: 31, ayah: 21, page: 413, juz: 21 },
-  { n: 43, surah: 33, ayah: 31, page: 422, juz: 22 },
-  { n: 44, surah: 34, ayah: 24, page: 431, juz: 22 },
-  { n: 45, surah: 36, ayah: 27, page: 442, juz: 23 },
-  { n: 46, surah: 37, ayah: 145, page: 451, juz: 23 },
-  { n: 47, surah: 39, ayah: 31, page: 462, juz: 24 },
-  { n: 48, surah: 40, ayah: 41, page: 472, juz: 24 },
-  { n: 49, surah: 41, ayah: 46, page: 482, juz: 25 },
-  { n: 50, surah: 43, ayah: 23, page: 491, juz: 25 },
-  { n: 51, surah: 46, ayah: 1, page: 502, juz: 26 },
-  { n: 52, surah: 48, ayah: 18, page: 513, juz: 26 },
-  { n: 53, surah: 51, ayah: 31, page: 522, juz: 27 },
-  { n: 54, surah: 55, ayah: 1, page: 531, juz: 27 },
-  { n: 55, surah: 58, ayah: 1, page: 542, juz: 28 },
-  { n: 56, surah: 62, ayah: 1, page: 553, juz: 28 },
-  { n: 57, surah: 67, ayah: 1, page: 562, juz: 29 },
-  { n: 58, surah: 72, ayah: 1, page: 572, juz: 29 },
-  { n: 59, surah: 78, ayah: 1, page: 582, juz: 30 },
-  { n: 60, surah: 87, ayah: 1, page: 591, juz: 30 },
-];
 
 export const THUMNS_PER_HIZB = 8;
 export const TOTAL_HIZBS = 60;
 export const TOTAL_SURAHS = 114;
 export const TOTAL_THUMNS = 480;
-export const LAST_PAGE = 604;
+
+/**
+ * حدود الأثمان والأحزاب كلها تُقرأ من جدول ورش (THUMN_ENDS) وحده: نهاية كل ثمن
+ * منقَّحة، وبدايتها ما يلي نهاية الثمن الذي قبلها. فلا تخطو الخطة خطوةً لا يعرفها
+ * المصحف، ولا يختلف عنوانُ المهمة عن نصِّها.
+ *
+ * أرقام الصفحات كلها من `src/data/warsh-pages.ts`: قائمة صفحات مصحف ورش — طباعة مجمع
+ * الملك فهد، ٦٠٤ صفحة — مُحوَّلةً إلى ترقيم آيات ورش قبل تحديد الصفحة، فلا صفحة تُبنى
+ * بخطوة ثابتة بين مطالع الأحزاب ولا يُقارَب فيها ترقيمُ المدينة. يُعاد توليده بـ
+ * `node scripts/build-warsh-pages.mjs`، ويحرس اتساقَه `npm run check:thumns`.
+ */
+
+/** الآية التالية في المصحف: تاليةُها في السورة، أو أول آية من السورة التالية عند تمامها. */
+export function nextAyah([surah, ayah]: ThumnEnd): ThumnEnd {
+  const last = SURAH_AYATS[surah - 1];
+  if (ayah < last) return [surah, ayah + 1];
+  for (let next = surah + 1; next <= TOTAL_SURAHS; next++) {
+    if (SURAH_AYATS[next - 1] > 0) return [next, 1];
+  }
+  return [surah, ayah]; // بعد آخر آية في الناس لا تالية
+}
+
+/** بداية كل ثمن = ما يلي نهاية الثمن الذي قبله مباشرة؛ وبداية الحزب ١ = الفاتحة ١. */
+function buildThumnStarts(): ThumnEnd[][] {
+  const starts: ThumnEnd[][] = [];
+  let cursor: ThumnEnd = [1, 1];
+  for (let hizb = 0; hizb < TOTAL_HIZBS; hizb++) {
+    const row: ThumnEnd[] = [];
+    for (let thumn = 0; thumn < THUMNS_PER_HIZB; thumn++) {
+      row.push(cursor);
+      cursor = nextAyah(THUMN_ENDS[hizb][thumn]);
+    }
+    starts.push(row);
+  }
+  return starts;
+}
+
+/** ٦٠ × ٨ بدايات، مشتقّة من الجدول — المرجع الوحيد لبدايات الأثمان والأحزاب. */
+export const THUMN_STARTS: readonly (readonly ThumnEnd[])[] = buildThumnStarts();
+
+/** بداية الحزب n = نهاية الثمن ٨ من الحزب n−١ + آية واحدة. */
+export const HIZB_STARTS: readonly ThumnEnd[] = THUMN_STARTS.map(row => row[0]);
+
+export const HIZBS: Hizb[] = HIZB_STARTS.map(([surah, ayah], index) => ({
+  n: index + 1,
+  surah,
+  ayah,
+  juz: Math.ceil((index + 1) / 2),
+  page: THUMN_START_POINTS[index][0][0],
+  endPage: HIZB_END_POINTS[index][0],
+}));
+
+/** عدد صفحات مصحف ورش (المدينة، طبعة مجمع الملك فهد) — للعرض «من ٦٠٤». */
+export const LAST_WARSH_PAGE = WARSH_MUSHAF_PAGES;
+
+/** صفحةُ بداية الحزب وصفحةُ نهايته، كما تُطبعان في مصحف ورش. */
+export function hizbPages(hizb: number): { page: number; endPage: number } {
+  const h = Math.min(TOTAL_HIZBS, Math.max(1, Math.round(hizb) || 1));
+  return { page: THUMN_START_POINTS[h - 1][0][0], endPage: HIZB_END_POINTS[h - 1][0] };
+}
+
+/** «ص ٥٤٥» إذا اتّفقت الصفحتان، و«ص ٥٤٤–٥٤٥» إذا امتدّ الورْد بينهما. */
+export function pageSpanLabel(from: number, to: number): string {
+  return from === to ? `ص ${toAr(from)}` : `ص ${toAr(from)}–${toAr(to)}`;
+}
+
+export function hizbPagesLabel(hizb: number): string {
+  const { page, endPage } = hizbPages(hizb);
+  return pageSpanLabel(page, endPage);
+}
 
 /**
  * أين يقع الثمن بالضبط: من السورة والآية إلى السورة والآية.
  *
- * الأثمان تُقرأ من جدول ورش المحقَّق (THUMN_ENDS) لا من معادلة تقسيم:
- * كل ثمن له بداية ونهاية معروفتان، فيطابق النصُّ عنوانَ المهمة تمامًا.
+ * القراءة كلها من جدول ورش المحقَّق (THUMN_ENDS وTHUMN_STARTS) لا من معادلة تقسيم،
+ * فيطابق النصُّ عنوانَ المهمة تمامًا — في أوّل الحزب وفي منتصفه.
  */
 export type ThumnPosition = {
   hizb: number;
@@ -210,40 +219,111 @@ export type ThumnPosition = {
   startAyah: number;
   endSurah: number;
   endAyah: number;
+  /** صفحتا البداية والنهاية في مصحف ورش. */
+  startPage: number;
+  endPage: number;
+  /** الترقيم المطبوع في مصحف ورش للآيتين نفسهما — قد يختلف عن ترقيم الجدول. */
+  warshStartSurah: number;
+  warshStartAyah: number;
+  warshEndSurah: number;
+  warshEndAyah: number;
 };
 
 export function thumnPosition(unit: number): ThumnPosition {
-  const safe = Math.min(TOTAL_THUMNS, Math.max(1, unit));
+  const safe = Math.min(TOTAL_THUMNS, Math.max(1, Math.round(unit) || 1));
   const { hizb, thumn } = fromThumnId(safe);
-  const ends = THUMN_ENDS[hizb - 1];
-  const [endSurah, endAyah] = ends[thumn - 1];
-  const previous = thumn > 1 ? ends[thumn - 2] : null;
-  const hizbStart = HIZBS[hizb - 1];
+  const [startSurah, startAyah] = THUMN_STARTS[hizb - 1][thumn - 1];
+  const [endSurah, endAyah] = THUMN_ENDS[hizb - 1][thumn - 1];
+  const [startPage, warshStartSurah, warshStartAyah] = THUMN_START_POINTS[hizb - 1][thumn - 1];
+  const [endPage, warshEndSurah, warshEndAyah] = THUMN_END_POINTS[hizb - 1][thumn - 1];
   return {
-    hizb,
-    thumn,
-    startSurah: previous ? previous[0] : hizbStart.surah,
-    startAyah: previous ? previous[1] + 1 : hizbStart.ayah,
-    endSurah,
-    endAyah,
+    hizb, thumn, startSurah, startAyah, endSurah, endAyah,
+    startPage, endPage, warshStartSurah, warshStartAyah, warshEndSurah, warshEndAyah,
   };
+}
+
+/**
+ * حدود أثمان متتابعة في حزب واحد — تُستعمل للمراجعة البعيدة (حزب كامل أو نصفه)،
+ * فترى الخطةُ والمصحفُ الحدود نفسها التي يراها جدول الأثمان.
+ */
+export function thumnRange(hizb: number, fromThumn = 1, toThumn = THUMNS_PER_HIZB): Omit<ThumnPosition, 'hizb' | 'thumn'> {
+  const from = Math.min(THUMNS_PER_HIZB, Math.max(1, fromThumn));
+  const to = Math.min(THUMNS_PER_HIZB, Math.max(from, toThumn));
+  const [startSurah, startAyah] = THUMN_STARTS[hizb - 1][from - 1];
+  const [endSurah, endAyah] = THUMN_ENDS[hizb - 1][to - 1];
+  const [startPage, warshStartSurah, warshStartAyah] = THUMN_START_POINTS[hizb - 1][from - 1];
+  const [endPage, warshEndSurah, warshEndAyah] = THUMN_END_POINTS[hizb - 1][to - 1];
+  return {
+    startSurah, startAyah, endSurah, endAyah,
+    startPage, endPage, warshStartSurah, warshStartAyah, warshEndSurah, warshEndAyah,
+  };
+}
+
+/** "البقرة ٢٥٣ – آل عمران ٤" — بداية الحزب ونهايته كما في جدول ورش. */
+export function hizbRangeLabel(hizb: number): string {
+  const { startSurah, startAyah, endSurah, endAyah } = thumnRange(hizb);
+  return rangeLabel(startSurah, startAyah, endSurah, endAyah);
+}
+
+export type ReaderFocus = {
+  surah: number;
+  ayah: number;
+  endSurah?: number;
+  endAyah?: number;
+  /**
+   * رقما الآيتين كما يُطبعان في مصحف ورش. يعتمد العارضُ ترقيمَ النصّ الواصل أولًا،
+   * فإن لم يجيء (عملٌ بلا شبكةٍ أو سورةٌ قديمة في الكاش) رجع إلى هذين لا إلى رقم الجدول.
+   */
+  warshAyah?: number;
+  warshEndAyah?: number;
+  page?: number;
+  endPage?: number;
+};
+
+/** بؤرةُ العارض من موضعٍ في جدول الأثمان (ثمنٌ واحد أو مدىً منها). */
+export function focusFromPosition(position: Omit<ThumnPosition, 'hizb' | 'thumn'>): ReaderFocus {
+  return {
+    surah: position.startSurah,
+    ayah: position.startAyah,
+    endSurah: position.endSurah,
+    endAyah: position.endAyah,
+    warshAyah: position.warshStartSurah === position.startSurah ? position.warshStartAyah : undefined,
+    warshEndAyah: position.warshEndSurah === position.endSurah ? position.warshEndAyah : undefined,
+    page: position.startPage,
+    endPage: position.endPage,
+  };
+}
+
+/** بؤرةُ ثمنٍ بعينه، فيطابق نصُّ المصحف عنوانَ المهمة آيةً وصفحةً. */
+export function thumnFocus(unit: number): ReaderFocus {
+  return focusFromPosition(thumnPosition(unit));
+}
+
+/** موضع الحزب كاملًا لعارض المصحف: من أول آية في ثمنه الأول إلى آخر آية في ثمنه الثامن. */
+export function hizbFocus(hizb: number): ReaderFocus {
+  return focusFromPosition(thumnRange(hizb));
+}
+
+/** وسْمُ مدى بين نقطتين: "الحشر ٣–١٠"، أو "البقرة ٢٥٣ – آل عمران ٤" إذا امتدّ بين سورتين. */
+export function rangeLabel(startSurah: number, startAyah: number, endSurah: number, endAyah: number): string {
+  if (startSurah === endSurah) return `${SURAHS[startSurah]} ${toAr(startAyah)}–${toAr(endAyah)}`;
+  return `${SURAHS[startSurah]} ${toAr(startAyah)} – ${SURAHS[endSurah]} ${toAr(endAyah)}`;
 }
 
 /** "الرحمن ٤١–٧٨" أو "البقرة ٢٨٣ – آل عمران ٤" حين يمتد الثمن بين سورتين. */
 export function thumnRangeLabel(unit: number): string {
   const { startSurah, startAyah, endSurah, endAyah } = thumnPosition(unit);
-  if (startSurah === endSurah) return `${SURAHS[startSurah]} ${toAr(startAyah)}–${toAr(endAyah)}`;
-  return `${SURAHS[startSurah]} ${toAr(startAyah)} – ${SURAHS[endSurah]} ${toAr(endAyah)}`;
+  return rangeLabel(startSurah, startAyah, endSurah, endAyah);
+}
+
+/** صفحةُ الثمن في مصحف ورش: "ص ٥٤٥" أو "ص ٥٤٤–٥٤٥". */
+export function thumnPageLabel(unit: number): string {
+  const { startPage, endPage } = thumnPosition(unit);
+  return pageSpanLabel(startPage, endPage);
 }
 
 export function thumnSurah(unit: number): number {
   return thumnPosition(unit).startSurah;
-}
-
-export function hizbPageSpan(hizb: number): { start: number; end: number; pages: number } {
-  const start = HIZBS[hizb - 1].page;
-  const end = hizb === 60 ? LAST_PAGE : HIZBS[hizb].page - 1;
-  return { start, end, pages: end - start + 1 };
 }
 
 export function pathHizbToMushaf(pathHizb: number): number {
@@ -254,6 +334,11 @@ export function mushafHizbToPath(mushafHizb: number): number {
   return TOTAL_HIZBS + 1 - mushafHizb;
 }
 
+/**
+ * رقم الثمن في مسار الحفظ: الحزب ٦٠ أولًا (ثمنه الأول = الثمن ١)، ثم ٥٩ … حتى الفاتحة.
+ * الثمن في المسار = (الحزب في المصحف مقلوبًا − ١) × ٨ + رقم الثمن من جدول ورش،
+ * فالتقسيم كله جدولٌ واحد لا تقسيمَان.
+ */
 export function thumnId(hizb: number, thumn: number): number {
   const pathHizb = mushafHizbToPath(hizb);
   return (pathHizb - 1) * THUMNS_PER_HIZB + thumn;
@@ -263,13 +348,6 @@ export function fromThumnId(id: number): { hizb: number; thumn: number } {
   const pathHizb = Math.ceil(id / THUMNS_PER_HIZB);
   const thumn = ((id - 1) % THUMNS_PER_HIZB) + 1;
   return { hizb: pathHizbToMushaf(pathHizb), thumn };
-}
-
-export function thumnPage(id: number): number {
-  const { hizb, thumn } = fromThumnId(id);
-  const { start, pages } = hizbPageSpan(hizb);
-  const offset = Math.round(((thumn - 1) * pages) / THUMNS_PER_HIZB);
-  return Math.min(start + offset, LAST_PAGE);
 }
 
 /**

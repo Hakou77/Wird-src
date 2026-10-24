@@ -1,0 +1,10 @@
+# بديلٌ إن رُفع المستودع كاملًا (مجلد wird-src بداخله) إلى Netlify كملف ZIP.
+# المشروع هو wird-src، وإعداداته — بما فيها netlify.toml الخاصة به — فيه.
+
+[build]
+  base = "wird-src"
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"

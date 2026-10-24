@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { BookOpen, ChevronLeft, ChevronRight, Crosshair } from 'lucide-react';
 import { SURAHS, SURAHS_BY_PATH, TOTAL_SURAHS, surahPathIndex, toAr } from '../data/quran';
 
-type Ayah = { number: number; text: string };
+type Ayah = { number: number; text: string; number_in_hafs?: number[] };
 type MushafMeta = { bismillah: string; font_file: string | null };
 
 const API_BASE = 'https://api.quranpedia.net/v1';
@@ -96,16 +96,42 @@ function toArabicDigits(value: number): string {
   return toAr(value);
 }
 
+/**
+ * رقم الآية كما يطبعه مصحفُ ورش.
+ *
+ * جدولُ الأثمان مكتوب على الترقيم المدني الجاري في النسخ الرقمية، ومصحف ورش يجمع أو
+ * يفصل آيات في تسعٍ وعشرين سورة؛ فيأتي النصُّ مع `number_in_hafs` لنعرف الآية نفسها لا
+ * رقمها وحده. وإذا غاب المجال (سورةٌ محفوظة من قبل) رجعنا إلى `fallback`: أرقامِ
+ * مصحف ورش في `src/data/warsh-pages.ts` — لا إلى رقم الجدول فيُظلَّم آيةٌ كاملة.
+ */
+function displayAyahNo(ayat: Ayah[], wanted: number, fallback?: number): number {
+  if (!Number.isInteger(wanted)) return fallback ?? wanted;
+  if (ayat.length) {
+    const mapped = ayat.find(ayah => ayah.number_in_hafs?.includes(wanted));
+    if (mapped) return mapped.number;
+    // ترقيمُ النصّ معروفٌ ولا آيةَ فيه برقم الجدول: اعتمد أرقامَ مصحف ورش المولَّدة.
+    if (ayat.some(ayah => ayah.number_in_hafs)) return fallback ?? wanted;
+    // سورةٌ محفوظة من غير هذا المجال: أرقامُها أرقامُ المصحف، فالتحويل واجبٌ كذلك.
+    if (Number.isInteger(fallback)) return fallback as number;
+  }
+  return wanted;
+}
+
 /** A plain-language description of the thumn you are working on. */
-function focusLabel(focus: { surah: number; ayah: number; endSurah?: number; endAyah?: number }): string {
+function focusLabel(focus: {
+  surah: number; ayah: number; endSurah?: number; endAyah?: number; page?: number; endPage?: number;
+}): string {
   const start = `سورة ${SURAHS[focus.surah]} من الآية ${toAr(focus.ayah)}`;
-  if (!focus.endAyah) return `موضع وردك: ${start}`;
+  const page = Number.isInteger(focus.page)
+    ? ` · ${focus.page === focus.endPage ? `ص ${toAr(focus.page!)}` : `ص ${toAr(focus.page!)}–${toAr(focus.endPage!)}`}`
+    : '';
+  if (!focus.endAyah) return `موضع وردك: ${start}${page}`;
   if (!focus.endSurah || focus.endSurah === focus.surah) {
     return focus.endAyah === focus.ayah
-      ? `موضع وردك: ${start}`
-      : `موضع وردك: ${start} إلى الآية ${toAr(focus.endAyah)}`;
+      ? `موضع وردك: ${start}${page}`
+      : `موضع وردك: ${start} إلى الآية ${toAr(focus.endAyah)}${page}`;
   }
-  return `موضع وردك: ${start} إلى آخر السورة، ثم سورة ${SURAHS[focus.endSurah]} حتى الآية ${toAr(focus.endAyah)}`;
+  return `موضع وردك: ${start} إلى آخر السورة، ثم سورة ${SURAHS[focus.endSurah]} حتى الآية ${toAr(focus.endAyah)}${page}`;
 }
 
 export default function WarshReader({
@@ -121,7 +147,17 @@ export default function WarshReader({
   hint?: string;
   orderHint?: string;
   /** Locate the exact ayah you are working on, so the text matches the task label. */
-  focus?: { surah: number; ayah: number; endSurah?: number; endAyah?: number };
+  focus?: {
+    surah: number;
+    ayah: number;
+    endSurah?: number;
+    endAyah?: number;
+    /** أرقامُ مصحف ورش، احتياطًا إذا لم يجيء ترقيمُ النصّ معها. */
+    warshAyah?: number;
+    warshEndAyah?: number;
+    page?: number;
+    endPage?: number;
+  };
   defaultOpen?: boolean;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -190,14 +226,24 @@ export default function WarshReader({
 
   const ayatRef = useRef<HTMLDivElement>(null);
   const scrolledTo = useRef('');
+
+  /** موضِعُ وردك بالأرقام المطبوعة في هذه السورة، لا بأرقام الجدول فقط. */
+  const focusActive = !!focus && loadedSurah === focus.surah;
+  const focusSpansSurahs = !!focus?.endSurah && focus.endSurah !== focus.surah;
+  const startAyah = focus ? (focusActive ? displayAyahNo(ayat, focus.ayah, focus.warshAyah) : focus.ayah) : 0;
+  const endAyah = focus
+    ? (focusActive && !focusSpansSurahs
+      ? displayAyahNo(ayat, focus.endAyah ?? focus.ayah, focus.warshEndAyah ?? focus.warshAyah)
+      : (focus.endAyah ?? focus.ayah))
+    : 0;
   // Put the target ayah in front of the reader instead of the top of the surah.
   // Runs once per target so it never fights the reader when they scroll or tick a step.
   useEffect(() => {
-    if (!focus || loadedSurah !== focus.surah) return;
-    const key = `${focus.surah}:${focus.ayah}:${loadedSurah}`;
+    if (!focus || loadedSurah !== focus.surah || !ayat.length) return;
+    const key = `${focus.surah}:${startAyah}:${loadedSurah}`;
     if (scrolledTo.current === key) return;
     const container = ayatRef.current;
-    const target = container?.querySelector<HTMLElement>(`[data-ayah="${focus.surah}:${focus.ayah}"]`);
+    const target = container?.querySelector<HTMLElement>(`[data-ayah="${focus.surah}:${startAyah}"]`);
     if (!container || !target) return;
     const frame = window.requestAnimationFrame(() => {
       const containerTop = container.getBoundingClientRect().top;
@@ -206,7 +252,7 @@ export default function WarshReader({
       scrolledTo.current = key;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [focus, loadedSurah, ayat]);
+  }, [focus, loadedSurah, ayat, startAyah]);
 
   const surahNumber = Number(surahInput);
   const surahName = surahNumber >= 1 && surahNumber <= TOTAL_SURAHS ? SURAHS[surahNumber] : '';
@@ -278,7 +324,7 @@ export default function WarshReader({
         {focus && (
           <div className="warsh-target">
             <Crosshair size={14} />
-            <span>{focusLabel(focus)}</span>
+            <span>{focusLabel({ ...focus, ayah: startAyah, endAyah })}</span>
             {loadedSurah !== focus.surah && (
               <button type="button" className="warsh-target-go" onClick={() => go(focus.surah)}>انتقل إلى موضعي</button>
             )}
@@ -302,9 +348,9 @@ export default function WarshReader({
           {showBasmala && <p className="basmala">{basmala}</p>}
           {ayat.map(ayah => {
             // The whole thumn is marked, not just its first ayah.
-            const inRange = !!focus && loadedSurah === focus.surah && ayah.number >= focus.ayah
-              && ayah.number <= (focus.endSurah && focus.endSurah !== focus.surah ? Number.MAX_SAFE_INTEGER : (focus.endAyah ?? focus.ayah));
-            const isFocus = !!focus && loadedSurah === focus.surah && ayah.number === focus.ayah;
+            const inRange = focusActive && ayah.number >= startAyah
+              && ayah.number <= (focusSpansSurahs ? Number.MAX_SAFE_INTEGER : endAyah);
+            const isFocus = focusActive && ayah.number === startAyah;
             return (
               <p key={ayah.number} data-ayah={`${loadedSurah}:${ayah.number}`} className={isFocus ? 'is-focus is-range-start' : inRange ? 'is-focus' : undefined}>
                 {ayah.text}
