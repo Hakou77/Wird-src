@@ -96,6 +96,18 @@ function toArabicDigits(value: number): string {
   return toAr(value);
 }
 
+/** A plain-language description of the thumn you are working on. */
+function focusLabel(focus: { surah: number; ayah: number; endSurah?: number; endAyah?: number }): string {
+  const start = `سورة ${SURAHS[focus.surah]} من الآية ${toAr(focus.ayah)}`;
+  if (!focus.endAyah) return `موضع وردك: ${start}`;
+  if (!focus.endSurah || focus.endSurah === focus.surah) {
+    return focus.endAyah === focus.ayah
+      ? `موضع وردك: ${start}`
+      : `موضع وردك: ${start} إلى الآية ${toAr(focus.endAyah)}`;
+  }
+  return `موضع وردك: ${start} إلى آخر السورة، ثم سورة ${SURAHS[focus.endSurah]} حتى الآية ${toAr(focus.endAyah)}`;
+}
+
 export default function WarshReader({
   defaultSurah,
   title = 'نص المصحف برواية ورش',
@@ -109,7 +121,7 @@ export default function WarshReader({
   hint?: string;
   orderHint?: string;
   /** Locate the exact ayah you are working on, so the text matches the task label. */
-  focus?: { surah: number; ayah: number };
+  focus?: { surah: number; ayah: number; endSurah?: number; endAyah?: number };
   defaultOpen?: boolean;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -266,7 +278,7 @@ export default function WarshReader({
         {focus && (
           <div className="warsh-target">
             <Crosshair size={14} />
-            <span>موضع وردك: سورة {SURAHS[focus.surah]} · الآية {toAr(focus.ayah)} تقريبًا</span>
+            <span>{focusLabel(focus)}</span>
             {loadedSurah !== focus.surah && (
               <button type="button" className="warsh-target-go" onClick={() => go(focus.surah)}>انتقل إلى موضعي</button>
             )}
@@ -289,9 +301,12 @@ export default function WarshReader({
         >
           {showBasmala && <p className="basmala">{basmala}</p>}
           {ayat.map(ayah => {
+            // The whole thumn is marked, not just its first ayah.
+            const inRange = !!focus && loadedSurah === focus.surah && ayah.number >= focus.ayah
+              && ayah.number <= (focus.endSurah && focus.endSurah !== focus.surah ? Number.MAX_SAFE_INTEGER : (focus.endAyah ?? focus.ayah));
             const isFocus = !!focus && loadedSurah === focus.surah && ayah.number === focus.ayah;
             return (
-              <p key={ayah.number} data-ayah={`${loadedSurah}:${ayah.number}`} className={isFocus ? 'is-focus' : undefined}>
+              <p key={ayah.number} data-ayah={`${loadedSurah}:${ayah.number}`} className={isFocus ? 'is-focus is-range-start' : inRange ? 'is-focus' : undefined}>
                 {ayah.text}
                 <span className="ayah-number"> ﴿{toArabicDigits(ayah.number)}﴾</span>
               </p>

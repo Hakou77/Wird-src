@@ -1586,8 +1586,10 @@ svg { flex-shrink: 0; }
 .warsh-status { font-size: 11px; color: #8a9a80; min-height: 20px; line-height: 1.9; }
 .warsh-ayat { font-size: 1.45rem; line-height: 2.3; font-family: 'Noto Naskh Arabic', serif; color: #2e3e32; background: #fffefa; border: 1px solid #ecefe3; border-radius: 8px; padding: 14px 16px; max-height: 420px; overflow-y: auto; }
 .warsh-ayat p { margin: 0 0 .6em; padding: 2px 4px; border-radius: 5px; scroll-margin-top: 6px; }
-.warsh-ayat p.is-focus { background: #f4f1e2; box-shadow: inset 3px 0 0 #c9a45c; }
-[data-theme='dark'] .warsh-ayat p.is-focus { background: #221f14; box-shadow: inset 3px 0 0 #c9a45c; }
+.warsh-ayat p.is-focus { background: #f7f4e6; }
+.warsh-ayat p.is-range-start { box-shadow: inset 3px 0 0 #c9a45c; border-radius: 0 5px 5px 0; }
+[data-theme='dark'] .warsh-ayat p.is-focus { background: #1d1a10; }
+[data-theme='dark'] .warsh-ayat p.is-range-start { box-shadow: inset 3px 0 0 #c9a45c; }
 .warsh-ayat p:last-child { margin-bottom: 0; }
 .warsh-ayat .basmala { text-align: center; }
 .warsh-ayat .ayah-number { color: #54765a; font-size: .7em; white-space: nowrap; }

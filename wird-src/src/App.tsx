@@ -15,7 +15,7 @@ import {
   type DayRecord, type Difficulty, type Mistake, type MistakeKind, type NearMark, type Page,
   type Settings, type TaskId, type TrackerState,
 } from './lib/tracker';
-import { HIZBS, SURAHS, pathHizbToMushaf, thumnPosition } from './data/quran';
+import { HIZBS, pathHizbToMushaf, thumnPosition, thumnRangeLabel } from './data/quran';
 import WarshReader from './components/WarshReader';
 import { TodayHero } from './components/NextStep';
 import { Guide } from './components/Guide';
@@ -257,15 +257,19 @@ export default function App() {
       if (session === 'near' && plan.nearThumns.length) return thumnPosition(plan.nearThumns[0]);
       if (session === 'far' && plan.farHizbs.length) {
         const hizb = HIZBS[plan.farHizbs[0] - 1];
-        return hizb ? { surah: hizb.surah, ayah: hizb.ayah } : undefined;
+        return hizb
+          ? { hizb: plan.farHizbs[0], thumn: 0, startSurah: hizb.surah, startAyah: hizb.ayah, endSurah: hizb.surah, endAyah: hizb.ayah }
+          : undefined;
       }
       return undefined;
     } catch {
       return undefined;
     }
   })();
-  const mushafFocus = mushafTarget ? { surah: mushafTarget.surah, ayah: mushafTarget.ayah } : undefined;
-  const mushafSurah = mushafTarget?.surah ?? HIZBS[currentHizb - 1]?.surah ?? 1;
+  const mushafFocus = mushafTarget
+    ? { surah: mushafTarget.startSurah, ayah: mushafTarget.startAyah, endSurah: mushafTarget.endSurah, endAyah: mushafTarget.endAyah }
+    : undefined;
+  const mushafSurah = mushafTarget?.startSurah ?? HIZBS[currentHizb - 1]?.surah ?? 1;
   const mushafTitle =
     session === 'new' ? 'نص الثمن الجديد من المصحف (ورش)'
     : session === 'yesterday' ? 'نص ثمن الأمس من المصحف (ورش)'
@@ -497,11 +501,10 @@ export default function App() {
     setConfirmation(null);
   }
 
-  /** One short locator that stays honest: hizb · thumn · the surah and ayah you actually reach. */
+  /** One exact locator straight from the thumn table: hizb · thumn · the ayahs it spans. */
   function unitWhere(unit: number) {
-    const { hizb, thumn, surah, ayah, page } = thumnPosition(unit);
-    // «≈» لأن موضع بداية الثمن محسوب من عدد الآيات داخل الحزب، لا من جدول أثمان جاهز.
-    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · ${SURAHS[surah]} ≈${ar(ayah)} · ص ${ar(page)}`;
+    const { hizb, thumn } = thumnPosition(unit);
+    return `الحزب ${ar(hizb)} · الثمن ${ar(thumn)} · ${thumnRangeLabel(unit)}`;
   }
 
   function taskDescription(task: TaskId): string {
